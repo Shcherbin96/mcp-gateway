@@ -21,7 +21,9 @@ def auth(x_api_key: str | None):
 
 
 def maybe_fail():
-    if FAILURE_RATE > 0 and random.random() < FAILURE_RATE:
+    # Non-cryptographic: only used to inject synthetic transient failures in
+    # the mock service for retry/backoff tests.
+    if FAILURE_RATE > 0 and random.random() < FAILURE_RATE:  # noqa: S311
         raise HTTPException(503, "transient_failure")
 
 

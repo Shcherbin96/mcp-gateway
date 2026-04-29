@@ -98,7 +98,12 @@ async def lifespan(app: FastAPI):
             settings.telegram_bot_token, settings.telegram_admin_chat_id
         )
         notifiers.append(tg_notifier)
-        tg_app = build_telegram_app(settings.telegram_bot_token, store, broadcaster)
+        tg_app = build_telegram_app(
+            settings.telegram_bot_token,
+            store,
+            broadcaster,
+            admin_chat_id=settings.telegram_admin_chat_id,
+        )
         await tg_app.initialize()
         await tg_app.start()
         await tg_app.updater.start_polling()

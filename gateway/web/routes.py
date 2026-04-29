@@ -2,7 +2,16 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -10,7 +19,18 @@ from sqlalchemy import select
 from gateway.approval.store import PENDING, ApprovalStore
 from gateway.approval.websocket import WebSocketBroadcaster
 from gateway.audit.reader import AuditFilter, AuditReader
+from gateway.config import get_settings
 from gateway.db.models import ApprovalRequest
+
+
+def _require_admin(authorization: str | None = Header(default=None)) -> str:
+    """Bearer-token auth for admin endpoints. Returns the admin user identity."""
+    settings = get_settings()
+    if settings.web_admin_token is None:
+        raise HTTPException(status_code=503, detail="admin auth not configured")
+    if authorization != f"Bearer {settings.web_admin_token}":
+        raise HTTPException(status_code=401, detail="unauthorized")
+    return settings.web_admin_user
 
 
 def make_router(
@@ -23,6 +43,7 @@ def make_router(
     default_tenant_id: UUID,  # MVP: single tenant filter for UI
 ) -> APIRouter:
     r = APIRouter()
+    settings = get_settings()
 
     @r.get("/audit", response_class=HTMLResponse)
     async def audit_page(request: Request):
@@ -36,7 +57,10 @@ def make_router(
         result_status: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        _admin: str = Depends(_require_admin),
     ):
+        limit = min(max(1, limit), 200)
+        offset = max(0, offset)
         f = AuditFilter(
             tenant_id=default_tenant_id,
             agent_id=UUID(agent_id) if agent_id else None,
@@ -57,7 +81,10 @@ def make_router(
         result_status: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        _admin: str = Depends(_require_admin),
     ):
+        limit = min(max(1, limit), 200)
+        offset = max(0, offset)
         f = AuditFilter(
             tenant_id=default_tenant_id,
             agent_id=UUID(agent_id) if agent_id else None,
@@ -91,7 +118,10 @@ def make_router(
         return templates.TemplateResponse(request, "approvals.html", {})
 
     @r.get("/approvals/list", response_class=HTMLResponse)
-    async def approvals_list(request: Request):
+    async def approvals_list(
+        request: Request,
+        admin: str = Depends(_require_admin),
+    ):
         async with session_factory() as s:
             res = await s.execute(
                 select(ApprovalRequest)
@@ -105,11 +135,11 @@ def make_router(
         return templates.TemplateResponse(
             request,
             "_approvals_list.html",
-            {"approvals": approvals, "user": "web-user"},
+            {"approvals": approvals, "user": admin},
         )
 
     @r.get("/api/approvals/pending")
-    async def pending_api():
+    async def pending_api(_admin: str = Depends(_require_admin)):
         async with session_factory() as s:
             res = await s.execute(
                 select(ApprovalRequest)
@@ -137,20 +167,34 @@ def make_router(
     async def decide(
         approval_id: UUID,
         decision: str = Query(...),
-        decided_by: str = Query("web-user"),
         reason: str | None = None,
+        admin: str = Depends(_require_admin),
     ):
         if decision not in ("approved", "rejected"):
             return HTMLResponse("invalid decision", status_code=400)
+        # decided_by is taken from the authenticated admin identity, never the
+        # caller — preventing audit forgery via query-param spoofing.
+        # tenant_id filter prevents cross-tenant decision via UUID guess.
         ok = await approval_store.decide(
-            approval_id, decision=decision, decided_by=decided_by, reason=reason
+            approval_id,
+            decision=decision,
+            decided_by=admin,
+            reason=reason,
+            tenant_id=default_tenant_id,
         )
         if ok:
             await broadcaster.notify_decided(approval_id=approval_id, status=decision)
         return HTMLResponse("")  # remove the row
 
     @r.websocket("/approvals/ws")
-    async def ws(websocket: WebSocket):
+    async def ws(websocket: WebSocket, token: str = Query(default="")):
+        # WebSocket auth via query param (browsers can't easily set headers).
+        if settings.web_admin_token is None:
+            await websocket.close(code=4503)
+            return
+        if token != settings.web_admin_token:
+            await websocket.close(code=4401)
+            return
         await broadcaster.connect(websocket)
         try:
             while True:

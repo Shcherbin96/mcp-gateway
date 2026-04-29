@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # Web admin auth (shared-secret bearer for /approvals/decide, audit, ws).
+    # MVP: single shared secret + identity. Replace with SSO later.
+    web_admin_token: str | None = None
+    web_admin_user: str = "web-admin"
+
 
 @lru_cache
 def get_settings() -> Settings:

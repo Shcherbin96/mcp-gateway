@@ -6,8 +6,6 @@ RUN pip install --no-cache-dir \
     "pyjwt[crypto]" \
     cryptography \
     pydantic
-COPY __init__.py /app/__init__.py
-COPY keys.py /app/keys.py
 COPY main.py /app/main.py
 EXPOSE 9000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000"]

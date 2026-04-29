@@ -11,13 +11,24 @@ from gateway.observability.logging import get_logger
 log = get_logger(__name__)
 
 
-def build_telegram_app(token: str, store: ApprovalStore, broadcaster) -> Application:
+def build_telegram_app(
+    token: str,
+    store: ApprovalStore,
+    broadcaster,
+    admin_chat_id: str | None = None,
+) -> Application:
     app = Application.builder().token(token).build()
 
     async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         q = update.callback_query
         if not q or not q.data:
             return
+        # Reject callbacks from chats other than the configured admin chat to
+        # prevent unauthorized approve/reject by anyone who guesses the bot.
+        if admin_chat_id is not None and q.message and q.message.chat:
+            if str(q.message.chat.id) != str(admin_chat_id):
+                await q.answer("Unauthorized", show_alert=True)
+                return
         action, _, approval_id = q.data.partition(":")
         decision = APPROVED if action == "approve" else REJECTED
         user = (

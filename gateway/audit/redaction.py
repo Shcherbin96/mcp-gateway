@@ -31,4 +31,8 @@ def chain(*fns: RedactFn) -> RedactFn:
     return apply
 
 
-IDENTITY: RedactFn = lambda p: dict(p)
+def _identity(p: Mapping) -> dict:
+    return dict(p)
+
+
+IDENTITY: RedactFn = _identity

@@ -1,4 +1,9 @@
-"""Mock OAuth 2.1 IdP with Dynamic Client Registration for local dev/tests."""
+"""Mock OAuth 2.1 IdP with Dynamic Client Registration for local dev/tests.
+
+Key material is inlined here (rather than a sibling ``keys.py``) so the
+module is self-contained — the Dockerfile copies just ``main.py`` into the
+container and the import works without preserving a package layout.
+"""
 
 import json
 import secrets
@@ -7,11 +12,29 @@ import uuid
 from typing import Any
 
 import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI, Form, HTTPException
 from jwt.algorithms import RSAAlgorithm
 from pydantic import BaseModel
 
-from mocks.idp.keys import KEY, KID, PRIVATE_PEM
+
+# --- Inline key material (was mocks/idp/keys.py) ---------------------------
+
+KID = "mock-idp-key-1"
+
+KEY: rsa.RSAPrivateKey = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+PUBLIC_PEM: str = KEY.public_key().public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+).decode()
+
+PRIVATE_PEM: bytes = KEY.private_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption(),
+)
 
 
 ISSUER = "http://localhost:9000"

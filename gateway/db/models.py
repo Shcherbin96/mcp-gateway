@@ -105,6 +105,7 @@ class AuditLog(Base, TimestampMixin):
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # nullable: auth_failed events occur before tenant resolution
     tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     agent_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     tool: Mapped[str | None] = mapped_column(String(128))

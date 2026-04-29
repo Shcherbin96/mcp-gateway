@@ -128,10 +128,10 @@ sequenceDiagram
     and WebSocket
       N->>H: broadcast to /approvals UI
     end
-    G->>A: wait_for_decision(id, timeout=5min)<br/>via LISTEN/NOTIFY
+    G->>A: wait_for_decision(id, timeout=5min)<br/>via polling (1s, MCP_APPROVAL_POLL_INTERVAL_SECONDS); LISTEN/NOTIFY planned
     H->>G: POST /approvals/{id} {decision: approved}
     G->>A: decide(id, approved, reviewer)
-    A->>D: UPDATE approval_requests + NOTIFY
+    A->>D: UPDATE approval_requests
     A-->>G: approved
     end
 

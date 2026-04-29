@@ -71,3 +71,32 @@ async def test_wait_for_decision_times_out(db_engine, seeded_ids):
     rid = await store.create(tenant_id=tid, agent_id=aid, tool="x", params={})
     status = await store.wait_for_decision(rid, timeout=0.5, poll_interval=0.1)
     assert status == TIMEOUT
+
+
+async def test_decide_with_tenant_filter(db_engine, seeded_ids):
+    """Cross-tenant decide must fail when tenant_id filter is enforced."""
+    from uuid import uuid4
+
+    sf = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    store = ApprovalStore(sf)
+    tid, aid = seeded_ids
+    rid = await store.create(tenant_id=tid, agent_id=aid, tool="x", params={})
+
+    # Wrong tenant_id: update must not match.
+    wrong_tid = uuid4()
+    ok = await store.decide(
+        rid, decision=APPROVED, decided_by="attacker", tenant_id=wrong_tid
+    )
+    assert ok is False
+    req = await store.get(rid)
+    assert req.status == "pending"
+    assert req.decided_by is None
+
+    # Correct tenant_id: update succeeds.
+    ok = await store.decide(
+        rid, decision=APPROVED, decided_by="legit", tenant_id=tid
+    )
+    assert ok is True
+    req = await store.get(rid)
+    assert req.status == APPROVED
+    assert req.decided_by == "legit"

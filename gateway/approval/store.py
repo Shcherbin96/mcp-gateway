@@ -48,22 +48,31 @@ class ApprovalStore:
         decision: str,
         decided_by: str,
         reason: str | None = None,
+        tenant_id: UUID | None = None,
     ) -> bool:
-        """Returns True if state transitioned, False if already decided."""
+        """Returns True if state transitioned, False if already decided.
+
+        When ``tenant_id`` is provided, the update is additionally scoped to
+        that tenant, preventing cross-tenant decisions via UUID guess.
+        ``None`` means no tenant filter (backward compatible).
+        """
         async with self._session_factory() as session:
-            res = await session.execute(
+            stmt = (
                 update(ApprovalRequest)
                 .where(
                     ApprovalRequest.id == req_id,
                     ApprovalRequest.status == PENDING,
                 )
-                .values(
-                    status=decision,
-                    decided_by=decided_by,
-                    decision_reason=reason,
-                    decided_at=datetime.now(timezone.utc),
-                )
             )
+            if tenant_id is not None:
+                stmt = stmt.where(ApprovalRequest.tenant_id == tenant_id)
+            stmt = stmt.values(
+                status=decision,
+                decided_by=decided_by,
+                decision_reason=reason,
+                decided_at=datetime.now(timezone.utc),
+            )
+            res = await session.execute(stmt)
             await session.commit()
             return res.rowcount > 0
 
