@@ -108,6 +108,31 @@ def make_router(
             {"approvals": approvals, "user": "web-user"},
         )
 
+    @r.get("/api/approvals/pending")
+    async def pending_api():
+        async with session_factory() as s:
+            res = await s.execute(
+                select(ApprovalRequest)
+                .where(
+                    ApprovalRequest.tenant_id == default_tenant_id,
+                    ApprovalRequest.status == PENDING,
+                )
+                .order_by(ApprovalRequest.created_at.desc())
+            )
+            approvals = res.scalars().all()
+        return {
+            "approvals": [
+                {
+                    "id": str(a.id),
+                    "tool": a.tool,
+                    "agent_id": str(a.agent_id),
+                    "params": a.params_json,
+                    "created_at": a.created_at.isoformat(),
+                }
+                for a in approvals
+            ]
+        }
+
     @r.post("/approvals/{approval_id}/decide", response_class=HTMLResponse)
     async def decide(
         approval_id: UUID,

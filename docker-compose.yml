@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mcp
+      POSTGRES_PASSWORD: mcp
+      POSTGRES_DB: mcp_gateway
+    ports:
+      - "5432:5432"
+    volumes:
+      - "pgdata:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp"]
+      interval: 5s
+      retries: 10
+
+  mock-idp:
+    build: ./mocks/idp
+    ports:
+      - "9000:9000"
+
+  mock-crm:
+    build: ./mocks/crm
+    environment:
+      MOCK_CRM_API_KEY: dev-crm-key
+    ports:
+      - "9001:9001"
+
+  mock-payments:
+    build: ./mocks/payments
+    environment:
+      MOCK_PAYMENTS_API_KEY: dev-payments-key
+    ports:
+      - "9002:9002"
+
+  migrate:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MCP_DATABASE_URL: postgresql+asyncpg://mcp:mcp@postgres:5432/mcp_gateway
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  gateway:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      mock-idp:
+        condition: service_started
+      mock-crm:
+        condition: service_started
+      mock-payments:
+        condition: service_started
+    environment:
+      MCP_DATABASE_URL: postgresql+asyncpg://mcp:mcp@postgres:5432/mcp_gateway
+      MCP_OAUTH_ISSUER: http://mock-idp:9000
+      MCP_OAUTH_JWKS_URL: http://mock-idp:9000/jwks
+      MCP_OAUTH_AUDIENCE: mcp-gateway
+      MCP_CRM_BASE_URL: http://mock-crm:9001
+      MCP_CRM_API_KEY: dev-crm-key
+      MCP_PAYMENTS_BASE_URL: http://mock-payments:9002
+      MCP_PAYMENTS_API_KEY: dev-payments-key
+      MCP_TELEGRAM_BOT_TOKEN: ${MCP_TELEGRAM_BOT_TOKEN:-}
+      MCP_TELEGRAM_ADMIN_CHAT_ID: ${MCP_TELEGRAM_ADMIN_CHAT_ID:-}
+      MCP_OTEL_ENDPOINT: ${MCP_OTEL_ENDPOINT:-}
+      MCP_LOG_LEVEL: ${MCP_LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+
+  seed:
+    build: .
+    depends_on:
+      gateway:
+        condition: service_healthy
+      mock-idp:
+        condition: service_started
+    environment:
+      MCP_DATABASE_URL: postgresql+asyncpg://mcp:mcp@postgres:5432/mcp_gateway
+      MCP_OAUTH_ISSUER: http://mock-idp:9000
+    command: ["python", "-m", "gateway.cli", "seed"]
+    restart: "no"
+
+volumes:
+  pgdata:
