@@ -1,0 +1,19 @@
+version: 1
+roles:
+  - name: support_agent
+    tools:
+      - tool: get_customer
+      - tool: list_orders
+      - tool: update_order
+      - tool: refund_payment
+        requires_approval: true
+  - name: readonly_analyst
+    tools:
+      - tool: get_customer
+      - tool: list_orders
+  - name: finance_admin
+    tools:
+      - tool: refund_payment
+        requires_approval: true
+      - tool: charge_card
+        requires_approval: true

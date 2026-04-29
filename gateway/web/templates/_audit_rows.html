@@ -1,0 +1,15 @@
+<table>
+  <thead><tr><th>Time</th><th>Agent</th><th>Tool</th><th>Status</th><th>Trace</th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+    <tr>
+      <td>{{ e.created_at.isoformat() }}</td>
+      <td>{{ e.agent_id or "-" }}</td>
+      <td>{{ e.tool or "-" }}</td>
+      <td class="status-{{ e.result_status }}">{{ e.result_status }}</td>
+      <td><code>{{ e.trace_id or "-" }}</code></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p>Total: {{ total }}</p>

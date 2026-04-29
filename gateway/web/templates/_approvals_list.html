@@ -1,0 +1,14 @@
+{% if approvals %}
+<ul>
+  {% for a in approvals %}
+    <li class="approval">
+      <strong>{{ a.tool }}</strong> by agent <code>{{ a.agent_id }}</code><br>
+      <pre>{{ a.params_json | tojson(indent=2) }}</pre>
+      <button hx-post="/approvals/{{ a.id }}/decide?decision=approved&decided_by={{ user }}" hx-target="closest li" hx-swap="outerHTML">Approve</button>
+      <button hx-post="/approvals/{{ a.id }}/decide?decision=rejected&decided_by={{ user }}" hx-target="closest li" hx-swap="outerHTML">Reject</button>
+    </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>No pending approvals.</p>
+{% endif %}

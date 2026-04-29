@@ -1,0 +1,11 @@
+/* gateway/web/static/styles.css */
+body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 2em auto; padding: 0 1em; color: #222; }
+header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 1em; }
+nav a { margin-right: .8em; }
+table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+th, td { border-bottom: 1px solid #eee; padding: .4em .6em; text-align: left; font-size: .9em; }
+.status-success { color: #2a7; } .status-denied, .status-rejected { color: #c33; } .status-timeout { color: #a60; } .status-error { color: #c00; }
+.approval { border: 1px solid #ddd; border-radius: 8px; padding: 1em; margin-bottom: 1em; }
+.approval pre { background: #f6f6f6; padding: .5em; overflow-x: auto; }
+button { padding: .3em .9em; margin-right: .5em; cursor: pointer; }
+form input, form select { padding: .3em .5em; margin-right: .5em; }
