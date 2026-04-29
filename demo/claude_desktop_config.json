@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mcp-gateway": {
+      "transport": {
+        "type": "http",
+        "url": "https://mcp-gateway.fly.dev/mcp",
+        "headers": {"Authorization": "Bearer <token>"}
+      }
+    }
+  }
+}

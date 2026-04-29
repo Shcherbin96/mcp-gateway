@@ -116,6 +116,13 @@ CI deploys on push to `main` (requires `FLY_API_TOKEN` secret).
 
 ---
 
+## Documentation
+
+- `docs/architecture.md` — components, sequence diagram for the refund + approval flow, ER diagram for the schema.
+- `docs/operations.md` — runbooks: rotate JWKS keys, query the audit log, seed a new tenant, swap mock IdP for a real one, view metrics in Grafana, export audit log to S3 (planned).
+
+---
+
 ## License
 
 MIT — see `LICENSE`.
