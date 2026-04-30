@@ -7,11 +7,14 @@ TenantResolver = UUID | Callable[[], Awaitable[UUID | None]]
 
 from fastapi import (
     APIRouter,
+    Body,
+    Cookie,
     Depends,
     Header,
     HTTPException,
     Query,
     Request,
+    Response,
     WebSocket,
     WebSocketDisconnect,
 )
@@ -23,7 +26,7 @@ from gateway.approval.store import PENDING, ApprovalStore
 from gateway.approval.websocket import WebSocketBroadcaster
 from gateway.audit.reader import AuditFilter, AuditReader
 from gateway.config import get_settings
-from gateway.db.models import ApprovalRequest
+from gateway.db.models import ApprovalRequest, Tenant
 
 
 def _require_admin(authorization: str | None = Header(default=None)) -> str:
@@ -36,6 +39,15 @@ def _require_admin(authorization: str | None = Header(default=None)) -> str:
     return settings.web_admin_user
 
 
+def _parse_uuid(value: str | None) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
 def make_router(
     *,
     templates: Jinja2Templates,
@@ -43,18 +55,72 @@ def make_router(
     approval_store: ApprovalStore,
     broadcaster: WebSocketBroadcaster,
     session_factory,
-    default_tenant_id: TenantResolver,  # MVP: single tenant. Pass UUID or async callable.
+    default_tenant_id: TenantResolver,  # MVP fallback: single tenant. UUID or async callable.
 ) -> APIRouter:
     r = APIRouter()
     settings = get_settings()
 
-    async def _tenant_id() -> UUID:
+    async def _default_tenant() -> UUID:
         if callable(default_tenant_id):
             tid = await default_tenant_id()
             if tid is None:
                 raise HTTPException(status_code=503, detail="no tenant seeded yet")
             return tid
         return default_tenant_id
+
+    async def _tenant_exists(tid: UUID) -> bool:
+        async with session_factory() as s:
+            res = await s.execute(select(Tenant.id).where(Tenant.id == tid))
+            return res.scalar_one_or_none() is not None
+
+    async def _resolve_tenant(
+        explicit: str | None,
+        cookie_tenant: str | None,
+    ) -> UUID:
+        """Resolution order: explicit query/form param -> cookie -> first tenant fallback.
+
+        Validates the candidate UUID actually exists in ``tenants`` before using
+        it; an unknown UUID raises 404 to avoid leaking data via random guesses
+        falling back silently to the default tenant.
+        """
+        explicit_uuid = _parse_uuid(explicit)
+        if explicit is not None and explicit != "":
+            # Caller explicitly supplied something — it MUST be valid+existing.
+            if explicit_uuid is None or not await _tenant_exists(explicit_uuid):
+                raise HTTPException(status_code=404, detail="tenant not found")
+            return explicit_uuid
+
+        cookie_uuid = _parse_uuid(cookie_tenant)
+        if cookie_uuid is not None and await _tenant_exists(cookie_uuid):
+            return cookie_uuid
+
+        return await _default_tenant()
+
+    @r.get("/api/tenants")
+    async def list_tenants(_admin: str = Depends(_require_admin)):
+        async with session_factory() as s:
+            res = await s.execute(select(Tenant.id, Tenant.name).order_by(Tenant.name))
+            return {"tenants": [{"id": str(row.id), "name": row.name} for row in res]}
+
+    @r.post("/api/tenants/select")
+    async def select_tenant(
+        payload: dict = Body(...),
+        _admin: str = Depends(_require_admin),
+    ):
+        raw = payload.get("tenant_id") if isinstance(payload, dict) else None
+        candidate = _parse_uuid(raw if isinstance(raw, str) else None)
+        if candidate is None or not await _tenant_exists(candidate):
+            raise HTTPException(status_code=404, detail="tenant not found")
+        response = Response(status_code=204)
+        response.set_cookie(
+            key="tenant_id",
+            value=str(candidate),
+            max_age=60 * 60 * 24 * 30,  # 30 days
+            httponly=True,
+            samesite="lax",
+            path="/",
+        )
+        return response
 
     @r.get("/audit", response_class=HTMLResponse)
     async def audit_page(request: Request):
@@ -68,12 +134,15 @@ def make_router(
         result_status: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        tenant_id: str | None = None,
+        cookie_tenant: str | None = Cookie(default=None, alias="tenant_id"),
         _admin: str = Depends(_require_admin),
     ):
         limit = min(max(1, limit), 200)
         offset = max(0, offset)
+        tid = await _resolve_tenant(tenant_id, cookie_tenant)
         f = AuditFilter(
-            tenant_id=await _tenant_id(),
+            tenant_id=tid,
             agent_id=UUID(agent_id) if agent_id else None,
             tool=tool or None,
             result_status=result_status or None,
@@ -92,12 +161,15 @@ def make_router(
         result_status: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        tenant_id: str | None = None,
+        cookie_tenant: str | None = Cookie(default=None, alias="tenant_id"),
         _admin: str = Depends(_require_admin),
     ):
         limit = min(max(1, limit), 200)
         offset = max(0, offset)
+        tid = await _resolve_tenant(tenant_id, cookie_tenant)
         f = AuditFilter(
-            tenant_id=await _tenant_id(),
+            tenant_id=tid,
             agent_id=UUID(agent_id) if agent_id else None,
             tool=tool or None,
             result_status=result_status or None,
@@ -131,9 +203,11 @@ def make_router(
     @r.get("/approvals/list", response_class=HTMLResponse)
     async def approvals_list(
         request: Request,
+        tenant_id: str | None = None,
+        cookie_tenant: str | None = Cookie(default=None, alias="tenant_id"),
         admin: str = Depends(_require_admin),
     ):
-        tid = await _tenant_id()
+        tid = await _resolve_tenant(tenant_id, cookie_tenant)
         async with session_factory() as s:
             res = await s.execute(
                 select(ApprovalRequest)
@@ -151,8 +225,12 @@ def make_router(
         )
 
     @r.get("/api/approvals/pending")
-    async def pending_api(_admin: str = Depends(_require_admin)):
-        tid = await _tenant_id()
+    async def pending_api(
+        tenant_id: str | None = None,
+        cookie_tenant: str | None = Cookie(default=None, alias="tenant_id"),
+        _admin: str = Depends(_require_admin),
+    ):
+        tid = await _resolve_tenant(tenant_id, cookie_tenant)
         async with session_factory() as s:
             res = await s.execute(
                 select(ApprovalRequest)
@@ -181,10 +259,13 @@ def make_router(
         approval_id: UUID,
         decision: str = Query(...),
         reason: str | None = None,
+        tenant_id: str | None = None,
+        cookie_tenant: str | None = Cookie(default=None, alias="tenant_id"),
         admin: str = Depends(_require_admin),
     ):
         if decision not in ("approved", "rejected"):
             return HTMLResponse("invalid decision", status_code=400)
+        tid = await _resolve_tenant(tenant_id, cookie_tenant)
         # decided_by is taken from the authenticated admin identity, never the
         # caller — preventing audit forgery via query-param spoofing.
         # tenant_id filter prevents cross-tenant decision via UUID guess.
@@ -193,7 +274,7 @@ def make_router(
             decision=decision,
             decided_by=admin,
             reason=reason,
-            tenant_id=await _tenant_id(),
+            tenant_id=tid,
         )
         if ok:
             await broadcaster.notify_decided(approval_id=approval_id, status=decision)

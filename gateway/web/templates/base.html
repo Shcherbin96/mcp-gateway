@@ -7,9 +7,89 @@
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <header><h1>MCP Gateway</h1>
-    <nav><a href="/audit">Audit</a> · <a href="/approvals">Approvals</a></nav>
+  <header>
+    <h1>MCP Gateway</h1>
+    <nav><a href="/audit">Audit</a> &middot; <a href="/approvals">Approvals</a></nav>
+    <div class="tenant-picker">
+      <label for="tenant-select">Tenant:</label>
+      <select id="tenant-select" aria-label="Select tenant">
+        <option value="">Loading&hellip;</option>
+      </select>
+      <span id="tenant-current" class="tenant-current"></span>
+    </div>
   </header>
   <main>{% block content %}{% endblock %}</main>
+  <script>
+    (function () {
+      const select = document.getElementById("tenant-select");
+      const currentLabel = document.getElementById("tenant-current");
+      if (!select) return;
+
+      function readCookie(name) {
+        const match = document.cookie
+          .split("; ")
+          .find((row) => row.startsWith(name + "="));
+        return match ? decodeURIComponent(match.split("=")[1]) : null;
+      }
+
+      function refreshLists() {
+        ["#rows", "#list"].forEach((sel) => {
+          const el = document.querySelector(sel);
+          if (el && window.htmx) window.htmx.trigger(el, "refresh");
+        });
+      }
+
+      async function loadTenants() {
+        try {
+          const res = await fetch("/api/tenants", { credentials: "same-origin" });
+          if (!res.ok) {
+            select.innerHTML = '<option value="">(unauthorized)</option>';
+            return;
+          }
+          const data = await res.json();
+          const tenants = data.tenants || [];
+          const active = readCookie("tenant_id");
+          select.innerHTML = "";
+          if (!tenants.length) {
+            select.innerHTML = '<option value="">(no tenants)</option>';
+            return;
+          }
+          for (const t of tenants) {
+            const opt = document.createElement("option");
+            opt.value = t.id;
+            opt.textContent = t.name;
+            if (active && t.id === active) {
+              opt.selected = true;
+              currentLabel.textContent = t.name;
+            }
+            select.appendChild(opt);
+          }
+          if (!active && tenants[0]) {
+            currentLabel.textContent = tenants[0].name;
+          }
+        } catch (err) {
+          select.innerHTML = '<option value="">(error)</option>';
+        }
+      }
+
+      select.addEventListener("change", async (ev) => {
+        const tenantId = ev.target.value;
+        if (!tenantId) return;
+        const res = await fetch("/api/tenants/select", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ tenant_id: tenantId }),
+        });
+        if (res.ok) {
+          const opt = ev.target.selectedOptions[0];
+          if (opt) currentLabel.textContent = opt.textContent;
+          refreshLists();
+        }
+      });
+
+      loadTenants();
+    })();
+  </script>
 </body>
 </html>

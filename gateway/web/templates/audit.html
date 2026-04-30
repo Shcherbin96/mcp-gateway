@@ -15,5 +15,5 @@
   </select>
   <button type="submit">Filter</button>
 </form>
-<div id="rows" hx-get="/audit/rows" hx-trigger="load">Loading…</div>
+<div id="rows" hx-get="/audit/rows" hx-trigger="load, refresh">Loading…</div>
 {% endblock %}

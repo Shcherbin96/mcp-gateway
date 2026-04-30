@@ -2,7 +2,7 @@
 {% block title %}Approvals{% endblock %}
 {% block content %}
 <h2>Pending approvals</h2>
-<div id="list" hx-get="/approvals/list" hx-trigger="load, every 3s"></div>
+<div id="list" hx-get="/approvals/list" hx-trigger="load, every 3s, refresh"></div>
 <script>
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/approvals/ws`);
   ws.onmessage = () => htmx.trigger("#list", "refresh");
