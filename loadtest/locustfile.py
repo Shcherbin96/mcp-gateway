@@ -1,9 +1,14 @@
 """Locust smoke load test for the MCP Gateway.
 
-At test start we register a client with the mock IdP and obtain a bearer
-token via the client_credentials grant. The token is stashed onto the
-shared ``environment.parsed_options`` namespace so each spawned
-``GatewayUser`` can pick it up in ``on_start``.
+At test start we extract the seeded OAuth client_id/secret from the gateway
+container logs (the ``make seed`` step prints them on startup) and exchange
+them for a bearer token. Reusing the seeded credentials means our load
+generator hits a real agent that exists in the gateway DB and has the
+right role/permissions — registering a fresh client at the IdP would
+fail policy checks since no Agent row backs it.
+
+Override with explicit env vars when running outside CI:
+    LOADTEST_CLIENT_ID=client-... LOADTEST_CLIENT_SECRET=... locust ...
 
 Run locally:
     locust -f loadtest/locustfile.py --host http://localhost:8000
@@ -14,6 +19,8 @@ Headless smoke (matches CI):
 """
 
 import os
+import re
+import subprocess
 
 import httpx
 from locust import HttpUser, between, events, task
@@ -21,23 +28,33 @@ from locust import HttpUser, between, events, task
 IDP = os.environ.get("IDP_URL", "http://localhost:9000")
 
 
+def _seeded_creds() -> tuple[str, str]:
+    cid = os.environ.get("LOADTEST_CLIENT_ID")
+    sec = os.environ.get("LOADTEST_CLIENT_SECRET")
+    if cid and sec:
+        return cid, sec
+    out = subprocess.check_output(
+        ["docker", "compose", "-f", "docker-compose.test.yml", "logs", "gateway"],
+        text=True,
+        timeout=10,
+    )
+    cid_m = re.search(r"OAuth client_id:\s*(\S+)", out)
+    sec_m = re.search(r"OAuth client_secret:\s*(\S+)", out)
+    if not cid_m or not sec_m:
+        raise RuntimeError("seed credentials not found in gateway logs")
+    return cid_m.group(1), sec_m.group(1)
+
+
 @events.test_start.add_listener
 def fetch_token(environment, **kwargs):
+    cid, sec = _seeded_creds()
     with httpx.Client() as c:
-        reg = c.post(
-            f"{IDP}/register",
-            json={
-                "client_name": "loadtest",
-                "tenant_id": "00000000-0000-0000-0000-000000000000",
-                "scopes": ["tool:get_customer", "tool:list_orders"],
-            },
-        ).json()
         tok = c.post(
             f"{IDP}/token",
             data={
                 "grant_type": "client_credentials",
-                "client_id": reg["client_id"],
-                "client_secret": reg["client_secret"],
+                "client_id": cid,
+                "client_secret": sec,
             },
         ).json()
         environment.parsed_options.token = tok["access_token"]
