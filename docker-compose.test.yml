@@ -57,6 +57,9 @@ services:
       MCP_APPROVAL_TIMEOUT_SECONDS: "5"
       MCP_LOG_LEVEL: INFO
       MCP_WEB_ADMIN_TOKEN: e2e-admin-token
+      # Locust load-smoke uses a single agent at ~30 RPS; raise default 60/min.
+      MCP_RATE_LIMIT_PER_MINUTE: "10000"
+      MCP_RATE_LIMIT_BURST: "1000"
     ports:
       - "8000:8000"
     command:
