@@ -1,6 +1,9 @@
 """Web UI router — audit log + approvals dashboard (HTMX + JSON API + WS)."""
 
+from collections.abc import Awaitable, Callable
 from uuid import UUID
+
+TenantResolver = UUID | Callable[[], Awaitable[UUID | None]]
 
 from fastapi import (
     APIRouter,
@@ -40,10 +43,18 @@ def make_router(
     approval_store: ApprovalStore,
     broadcaster: WebSocketBroadcaster,
     session_factory,
-    default_tenant_id: UUID,  # MVP: single tenant filter for UI
+    default_tenant_id: TenantResolver,  # MVP: single tenant. Pass UUID or async callable.
 ) -> APIRouter:
     r = APIRouter()
     settings = get_settings()
+
+    async def _tenant_id() -> UUID:
+        if callable(default_tenant_id):
+            tid = await default_tenant_id()
+            if tid is None:
+                raise HTTPException(status_code=503, detail="no tenant seeded yet")
+            return tid
+        return default_tenant_id
 
     @r.get("/audit", response_class=HTMLResponse)
     async def audit_page(request: Request):
@@ -62,7 +73,7 @@ def make_router(
         limit = min(max(1, limit), 200)
         offset = max(0, offset)
         f = AuditFilter(
-            tenant_id=default_tenant_id,
+            tenant_id=await _tenant_id(),
             agent_id=UUID(agent_id) if agent_id else None,
             tool=tool or None,
             result_status=result_status or None,
@@ -86,7 +97,7 @@ def make_router(
         limit = min(max(1, limit), 200)
         offset = max(0, offset)
         f = AuditFilter(
-            tenant_id=default_tenant_id,
+            tenant_id=await _tenant_id(),
             agent_id=UUID(agent_id) if agent_id else None,
             tool=tool or None,
             result_status=result_status or None,
@@ -180,7 +191,7 @@ def make_router(
             decision=decision,
             decided_by=admin,
             reason=reason,
-            tenant_id=default_tenant_id,
+            tenant_id=await _tenant_id(),
         )
         if ok:
             await broadcaster.notify_decided(approval_id=approval_id, status=decision)

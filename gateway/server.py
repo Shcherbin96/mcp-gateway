@@ -3,6 +3,7 @@
 import contextlib
 import time
 from pathlib import Path
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -130,30 +131,29 @@ async def lifespan(app: FastAPI):
     reaper = TimeoutReaper(sf, settings.approval_timeout_seconds, broadcaster)
     reaper.start()
 
-    # Web router (single-tenant view: pick first tenant)
-    try:
-        async with sf() as s:
-            first = (await s.execute(select(Tenant).limit(1))).scalar_one_or_none()
-    except Exception as e:
-        log.warning("web_router_skipped_db_error", error=str(e))
-        first = None
+    # Web router (single-tenant view). Tenant resolution happens lazily on each
+    # request via a callable, so the gateway can boot before seeding completes.
+    templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
 
-    if first is not None:
-        templates = Jinja2Templates(
-            directory=str(Path(__file__).parent / "web" / "templates")
+    async def _resolve_default_tenant() -> UUID | None:
+        try:
+            async with sf() as s:
+                first = (await s.execute(select(Tenant).limit(1))).scalar_one_or_none()
+                return first.id if first is not None else None
+        except Exception as e:
+            log.warning("web_default_tenant_lookup_failed", error=str(e))
+            return None
+
+    app.include_router(
+        make_router(
+            templates=templates,
+            audit_reader=reader,
+            approval_store=store,
+            broadcaster=broadcaster,
+            session_factory=sf,
+            default_tenant_id=_resolve_default_tenant,
         )
-        app.include_router(
-            make_router(
-                templates=templates,
-                audit_reader=reader,
-                approval_store=store,
-                broadcaster=broadcaster,
-                session_factory=sf,
-                default_tenant_id=first.id,
-            )
-        )
-    else:
-        log.warning("web_router_skipped_no_tenants")
+    )
 
     try:
         yield

@@ -16,6 +16,9 @@ services:
 
   mock-idp:
     build: ./mocks/idp
+    environment:
+      MOCK_IDP_ISSUER: http://mock-idp:9000
+      MOCK_IDP_AUDIENCE: mcp-gateway
     ports:
       - "9000:9000"
 
@@ -69,6 +72,7 @@ services:
       MCP_TELEGRAM_ADMIN_CHAT_ID: ${MCP_TELEGRAM_ADMIN_CHAT_ID:-}
       MCP_OTEL_ENDPOINT: ${MCP_OTEL_ENDPOINT:-}
       MCP_LOG_LEVEL: ${MCP_LOG_LEVEL:-INFO}
+      MCP_WEB_ADMIN_TOKEN: ${MCP_WEB_ADMIN_TOKEN:-demo-admin-token-change-me}
     ports:
       - "8000:8000"
 
