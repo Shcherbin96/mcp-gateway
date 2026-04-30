@@ -38,6 +38,20 @@ MCP Gateway is that envelope.
 
 ---
 
+## Screenshots
+
+| Telegram approval card | Audit log UI |
+|---|---|
+| ![Telegram approval](docs/screenshots/01-telegram-approval.png) | ![Audit UI](docs/screenshots/02-audit-log-ui.png) |
+
+| Approvals dashboard | Grafana metrics |
+|---|---|
+| ![Approvals UI](docs/screenshots/03-approvals-pending-ui.png) | ![Grafana](docs/screenshots/04-grafana-dashboard.png) |
+
+> See `docs/screenshots/README.md` for how to reproduce these.
+
+---
+
 ## Architecture
 
 ```mermaid
