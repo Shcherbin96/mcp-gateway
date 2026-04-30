@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     # Policy
     policy_file: str = "config/policies.yaml"
 
-    # Server
-    host: str = "0.0.0.0"
+    # Server — bind all interfaces is intentional inside the container.
+    host: str = "0.0.0.0"  # nosec B104
     port: int = 8000
 
     # Web admin auth (shared-secret bearer for /approvals/decide, audit, ws).

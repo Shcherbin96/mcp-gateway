@@ -6,17 +6,22 @@ would manifest as response entries with an ``agent_id`` other than the one
 requested.
 """
 
+import os
+
 import httpx
 import pytest
 
 pytestmark = [pytest.mark.security, pytest.mark.e2e]
+
+ADMIN_TOKEN = os.environ.get("E2E_ADMIN_TOKEN", "e2e-admin-token")
 
 
 async def test_audit_api_does_not_leak_other_tenants() -> None:
     """Audit API uses default_tenant_id from server; cross-tenant requires multi-tenant setup."""
     async with httpx.AsyncClient() as c:
         r = await c.get(
-            "http://localhost:8000/api/audit?agent_id=00000000-0000-0000-0000-000000000099"
+            "http://localhost:8000/api/audit?agent_id=00000000-0000-0000-0000-000000000099",
+            headers={"Authorization": f"Bearer {ADMIN_TOKEN}"},
         )
         assert r.status_code == 200
         assert all(

@@ -6,6 +6,7 @@ container and the import works without preserving a package layout.
 """
 
 import json
+import os
 import secrets
 import time
 import uuid
@@ -37,8 +38,8 @@ PRIVATE_PEM: bytes = KEY.private_bytes(
 )
 
 
-ISSUER = "http://localhost:9000"
-DEFAULT_AUDIENCE = "mcp-gateway"
+ISSUER = os.environ.get("MOCK_IDP_ISSUER", "http://localhost:9000")
+DEFAULT_AUDIENCE = os.environ.get("MOCK_IDP_AUDIENCE", "mcp-gateway")
 
 
 # In-memory client + agent registry

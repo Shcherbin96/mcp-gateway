@@ -14,6 +14,9 @@ services:
 
   mock-idp:
     build: ./mocks/idp
+    environment:
+      MOCK_IDP_ISSUER: http://mock-idp:9000
+      MOCK_IDP_AUDIENCE: mcp-gateway
     ports:
       - "9000:9000"
 
@@ -53,6 +56,7 @@ services:
       MCP_PAYMENTS_API_KEY: dev-payments-key
       MCP_APPROVAL_TIMEOUT_SECONDS: "5"
       MCP_LOG_LEVEL: INFO
+      MCP_WEB_ADMIN_TOKEN: e2e-admin-token
     ports:
       - "8000:8000"
     command:

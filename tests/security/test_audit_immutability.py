@@ -8,15 +8,23 @@ UPDATE/DELETE privileges should cause both statements to raise
 Requires a running Postgres with migrations applied; tagged as integration.
 """
 
+from urllib.parse import urlparse
+
 import asyncpg
 import pytest
 
 pytestmark = [pytest.mark.security, pytest.mark.integration]
 
 
-async def test_app_user_cannot_update_audit() -> None:
+async def test_app_user_cannot_update_audit(pg_url: str) -> None:
+    """Verify GRANTs prevent the application user from mutating audit_log rows."""
+    parsed = urlparse(pg_url.replace("postgresql+asyncpg://", "postgresql://"))
     conn = await asyncpg.connect(
-        "postgresql://mcp_app:mcp_app@localhost:5432/mcp_gateway"
+        host=parsed.hostname,
+        port=parsed.port,
+        user="mcp_app",
+        password="mcp_app",
+        database=parsed.path.lstrip("/"),
     )
     try:
         with pytest.raises(asyncpg.InsufficientPrivilegeError):

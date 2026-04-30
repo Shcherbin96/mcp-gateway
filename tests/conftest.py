@@ -31,21 +31,26 @@ async def db_engine(pg_url: str):
     engine = create_async_engine(pg_url, pool_pre_ping=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # asyncpg prepared statements forbid multi-statement strings — split per call.
         await conn.exec_driver_sql(
-            """
-            CREATE OR REPLACE FUNCTION audit_log_no_modify_fn() RETURNS trigger AS $$
-            BEGIN RAISE EXCEPTION 'audit_log is append-only'; END;
-            $$ LANGUAGE plpgsql;
-            """
+            "CREATE OR REPLACE FUNCTION audit_log_no_modify_fn() RETURNS trigger AS $$ "
+            "BEGIN RAISE EXCEPTION 'audit_log is append-only'; END; $$ LANGUAGE plpgsql"
         )
+        await conn.exec_driver_sql("DROP TRIGGER IF EXISTS audit_log_no_modify ON audit_log")
         await conn.exec_driver_sql(
-            """
-            DROP TRIGGER IF EXISTS audit_log_no_modify ON audit_log;
-            CREATE TRIGGER audit_log_no_modify
-            BEFORE UPDATE OR DELETE ON audit_log
-            FOR EACH ROW EXECUTE FUNCTION audit_log_no_modify_fn();
-            """
+            "CREATE TRIGGER audit_log_no_modify "
+            "BEFORE UPDATE OR DELETE ON audit_log "
+            "FOR EACH ROW EXECUTE FUNCTION audit_log_no_modify_fn()"
         )
+        # Application user for security tests (matches alembic 0001 setup)
+        await conn.exec_driver_sql(
+            "DO $$ BEGIN "
+            "IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'mcp_app') THEN "
+            "CREATE USER mcp_app WITH PASSWORD 'mcp_app'; END IF; END $$"
+        )
+        await conn.exec_driver_sql("GRANT INSERT, SELECT ON audit_log TO mcp_app")
+        await conn.exec_driver_sql("REVOKE UPDATE, DELETE, TRUNCATE ON audit_log FROM mcp_app")
+        await conn.exec_driver_sql("GRANT USAGE, SELECT ON SEQUENCE audit_log_id_seq TO mcp_app")
     yield engine
     await engine.dispose()
 

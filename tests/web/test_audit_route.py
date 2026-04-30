@@ -2,10 +2,10 @@
 
 from uuid import uuid4
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.templating import Jinja2Templates
-from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from gateway.approval.store import ApprovalStore
@@ -18,7 +18,12 @@ from gateway.web.routes import make_router
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 
 
-async def test_audit_html_renders(db_engine, tmp_path):
+async def test_audit_html_renders(db_engine, monkeypatch):
+    monkeypatch.setenv("MCP_WEB_ADMIN_TOKEN", "test-secret")
+    from gateway.config import get_settings
+
+    get_settings.cache_clear()
+
     sf = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
     async with sf() as s:
         t = Tenant(name=f"t-{uuid4()}")
@@ -46,7 +51,13 @@ async def test_audit_html_renders(db_engine, tmp_path):
         )
     )
 
-    with TestClient(app) as c:
-        r = c.get("/audit/rows")
-        assert r.status_code == 200
-        assert "get_customer" in r.text
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            r = await c.get(
+                "/audit/rows", headers={"Authorization": "Bearer test-secret"}
+            )
+            assert r.status_code == 200
+            assert "get_customer" in r.text
+    finally:
+        get_settings.cache_clear()

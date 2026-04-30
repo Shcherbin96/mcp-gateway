@@ -12,17 +12,35 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-async def seeded_ids(db_session):
-    t = Tenant(name="t1")
-    db_session.add(t)
-    await db_session.flush()
-    r = Role(tenant_id=t.id, name="support")
-    db_session.add(r)
-    await db_session.flush()
-    a = Agent(tenant_id=t.id, name="a1", role_id=r.id)
-    db_session.add(a)
-    await db_session.commit()
-    return t.id, a.id
+async def seeded_ids(db_engine):
+    """Seed a tenant + role + agent via a real (committed) session, then clean up."""
+    from uuid import uuid4
+
+    from sqlalchemy import delete
+
+    sf = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    async with sf() as s:
+        t = Tenant(name=f"t-{uuid4()}")
+        s.add(t)
+        await s.flush()
+        r = Role(tenant_id=t.id, name="support")
+        s.add(r)
+        await s.flush()
+        a = Agent(tenant_id=t.id, name="a1", role_id=r.id)
+        s.add(a)
+        await s.commit()
+        tid, aid, rid_role = t.id, a.id, r.id
+
+    yield tid, aid
+
+    from gateway.db.models import ApprovalRequest
+
+    async with sf() as s:
+        await s.execute(delete(ApprovalRequest).where(ApprovalRequest.tenant_id == tid))
+        await s.execute(delete(Agent).where(Agent.id == aid))
+        await s.execute(delete(Role).where(Role.id == rid_role))
+        await s.execute(delete(Tenant).where(Tenant.id == tid))
+        await s.commit()
 
 
 async def test_create_and_decide(db_engine, seeded_ids):
