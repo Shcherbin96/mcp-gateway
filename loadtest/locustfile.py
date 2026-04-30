@@ -33,8 +33,8 @@ def _seeded_creds() -> tuple[str, str]:
     sec = os.environ.get("LOADTEST_CLIENT_SECRET")
     if cid and sec:
         return cid, sec
-    out = subprocess.check_output(  # noqa: S607 — `docker` resolved on PATH at CI time
-        ["docker", "compose", "-f", "docker-compose.test.yml", "logs", "gateway"],
+    out = subprocess.check_output(
+        ["docker", "compose", "-f", "docker-compose.test.yml", "logs", "gateway"],  # noqa: S607
         text=True,
         timeout=10,
     )
