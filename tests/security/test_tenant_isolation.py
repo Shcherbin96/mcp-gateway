@@ -25,6 +25,5 @@ async def test_audit_api_does_not_leak_other_tenants() -> None:
         )
         assert r.status_code == 200
         assert all(
-            e["agent_id"] == "00000000-0000-0000-0000-000000000099"
-            for e in r.json()["entries"]
+            e["agent_id"] == "00000000-0000-0000-0000-000000000099" for e in r.json()["entries"]
         )

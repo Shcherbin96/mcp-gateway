@@ -102,18 +102,14 @@ async def test_decide_with_tenant_filter(db_engine, seeded_ids):
 
     # Wrong tenant_id: update must not match.
     wrong_tid = uuid4()
-    ok = await store.decide(
-        rid, decision=APPROVED, decided_by="attacker", tenant_id=wrong_tid
-    )
+    ok = await store.decide(rid, decision=APPROVED, decided_by="attacker", tenant_id=wrong_tid)
     assert ok is False
     req = await store.get(rid)
     assert req.status == "pending"
     assert req.decided_by is None
 
     # Correct tenant_id: update succeeds.
-    ok = await store.decide(
-        rid, decision=APPROVED, decided_by="legit", tenant_id=tid
-    )
+    ok = await store.decide(rid, decision=APPROVED, decided_by="legit", tenant_id=tid)
     assert ok is True
     req = await store.get(rid)
     assert req.status == APPROVED

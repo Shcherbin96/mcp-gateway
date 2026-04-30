@@ -1,7 +1,6 @@
 """Redaction helpers for audit log params."""
 
-from typing import Callable, Mapping
-
+from collections.abc import Callable, Mapping
 
 RedactFn = Callable[[Mapping], dict]
 
@@ -28,6 +27,7 @@ def chain(*fns: RedactFn) -> RedactFn:
         for fn in fns:
             out = fn(out)
         return out
+
     return apply
 
 

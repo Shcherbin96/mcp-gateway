@@ -54,9 +54,7 @@ async def test_audit_html_renders(db_engine, monkeypatch):
     try:
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-            r = await c.get(
-                "/audit/rows", headers={"Authorization": "Bearer test-secret"}
-            )
+            r = await c.get("/audit/rows", headers={"Authorization": "Bearer test-secret"})
             assert r.status_code == 200
             assert "get_customer" in r.text
     finally:

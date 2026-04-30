@@ -10,17 +10,13 @@ from gateway.tools.upstream import UpstreamClient
 def build_payment_tools(
     client: UpstreamClient,
 ) -> list[tuple[ToolMeta, Callable[..., Awaitable[dict]]]]:
-    async def refund_payment(
-        customer_id: str, amount: float, reason: str | None = None
-    ) -> dict:
+    async def refund_payment(customer_id: str, amount: float, reason: str | None = None) -> dict:
         return await client.post(
             "/refunds",
             json={"customer_id": customer_id, "amount": amount, "reason": reason},
         )
 
-    async def charge_card(
-        card_number: str, amount: float, customer_id: str | None = None
-    ) -> dict:
+    async def charge_card(card_number: str, amount: float, customer_id: str | None = None) -> dict:
         return await client.post(
             "/charges",
             json={

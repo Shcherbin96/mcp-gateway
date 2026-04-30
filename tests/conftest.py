@@ -60,7 +60,9 @@ async def db_session(db_engine) -> AsyncIterator[AsyncSession]:
     """Transactional fixture — every test rolls back."""
     async with db_engine.connect() as conn:
         trans = await conn.begin()
-        sess = AsyncSession(bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        sess = AsyncSession(
+            bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint"
+        )
         try:
             yield sess
         finally:

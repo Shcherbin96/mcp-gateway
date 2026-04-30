@@ -94,9 +94,7 @@ class ApprovalRequest(Base, TimestampMixin):
     decided_by: Mapped[str | None] = mapped_column(String(255))
     decision_reason: Mapped[str | None] = mapped_column(String(1024))
 
-    __table_args__ = (
-        Index("ix_approval_requests_pending", "tenant_id", "status", "created_at"),
-    )
+    __table_args__ = (Index("ix_approval_requests_pending", "tenant_id", "status", "created_at"),)
 
 
 class AuditLog(Base, TimestampMixin):

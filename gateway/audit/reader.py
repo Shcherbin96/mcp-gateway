@@ -31,9 +31,7 @@ class AuditReader:
     def __init__(self, session_factory):
         self._sf = session_factory
 
-    async def query(
-        self, f: AuditFilter, *, limit: int = 50, offset: int = 0
-    ) -> AuditPage:
+    async def query(self, f: AuditFilter, *, limit: int = 50, offset: int = 0) -> AuditPage:
         stmt = select(AuditLog).where(AuditLog.tenant_id == f.tenant_id)
         if f.agent_id:
             stmt = stmt.where(AuditLog.agent_id == f.agent_id)

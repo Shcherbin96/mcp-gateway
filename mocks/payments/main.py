@@ -1,10 +1,10 @@
 import os
 import random
 import uuid
-from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException, Header
-from pydantic import BaseModel
+from datetime import UTC, datetime
 
+from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel
 
 API_KEY = os.environ.get("MOCK_PAYMENTS_API_KEY", "dev-payments-key")
 FAILURE_RATE = float(os.environ.get("MOCK_PAYMENTS_FAILURE_RATE", "0"))  # for testing retries
@@ -52,7 +52,7 @@ def refund(
         "type": "refund",
         "status": "completed",
         "reason": req.reason,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
     PAYMENTS[key] = rec
     return rec
@@ -83,7 +83,7 @@ def charge(
         "type": "charge",
         "status": "completed",
         "card_last4": req.card_number[-4:] if len(req.card_number) >= 4 else "****",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
     PAYMENTS[key] = rec
     return rec

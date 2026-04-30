@@ -1,7 +1,7 @@
 """Approval request persistence + atomic decision transitions."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -18,9 +18,7 @@ class ApprovalStore:
     def __init__(self, session_factory):
         self._session_factory = session_factory
 
-    async def create(
-        self, *, tenant_id: UUID, agent_id: UUID, tool: str, params: dict
-    ) -> UUID:
+    async def create(self, *, tenant_id: UUID, agent_id: UUID, tool: str, params: dict) -> UUID:
         async with self._session_factory() as session:
             req = ApprovalRequest(
                 tenant_id=tenant_id,
@@ -36,9 +34,7 @@ class ApprovalStore:
 
     async def get(self, req_id: UUID) -> ApprovalRequest | None:
         async with self._session_factory() as session:
-            res = await session.execute(
-                select(ApprovalRequest).where(ApprovalRequest.id == req_id)
-            )
+            res = await session.execute(select(ApprovalRequest).where(ApprovalRequest.id == req_id))
             return res.scalar_one_or_none()
 
     async def decide(
@@ -57,12 +53,9 @@ class ApprovalStore:
         ``None`` means no tenant filter (backward compatible).
         """
         async with self._session_factory() as session:
-            stmt = (
-                update(ApprovalRequest)
-                .where(
-                    ApprovalRequest.id == req_id,
-                    ApprovalRequest.status == PENDING,
-                )
+            stmt = update(ApprovalRequest).where(
+                ApprovalRequest.id == req_id,
+                ApprovalRequest.status == PENDING,
             )
             if tenant_id is not None:
                 stmt = stmt.where(ApprovalRequest.tenant_id == tenant_id)
@@ -70,7 +63,7 @@ class ApprovalStore:
                 status=decision,
                 decided_by=decided_by,
                 decision_reason=reason,
-                decided_at=datetime.now(timezone.utc),
+                decided_at=datetime.now(UTC),
             )
             res = await session.execute(stmt)
             await session.commit()
@@ -88,7 +81,5 @@ class ApprovalStore:
                 return req.status
             await asyncio.sleep(poll_interval)
         # Timeout: try to mark
-        await self.decide(
-            req_id, decision=TIMEOUT, decided_by="system", reason="timeout"
-        )
+        await self.decide(req_id, decision=TIMEOUT, decided_by="system", reason="timeout")
         return TIMEOUT

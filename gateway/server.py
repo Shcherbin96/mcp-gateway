@@ -23,10 +23,10 @@ from gateway.auth.token_validator import JWKSTokenValidator
 from gateway.config import get_settings
 from gateway.db.models import Tenant
 from gateway.db.session import engine
+from gateway.middleware.approve import make_approve
 from gateway.middleware.audit import make_audit
 from gateway.middleware.authenticate import make_authenticate
 from gateway.middleware.authorize import make_authorize
-from gateway.middleware.approve import make_approve
 from gateway.middleware.chain import CallContext, Pipeline
 from gateway.middleware.execute import make_execute
 from gateway.observability.logging import configure_logging, get_logger
@@ -39,7 +39,6 @@ from gateway.tools.payments import build_payment_tools
 from gateway.tools.registry import ToolRegistry
 from gateway.tools.upstream import UpstreamClient
 from gateway.web.routes import make_router
-
 
 log = get_logger(__name__)
 settings = get_settings()
@@ -78,9 +77,7 @@ async def lifespan(app: FastAPI):
 
     # Tools
     crm_client = UpstreamClient(settings.crm_base_url, settings.crm_api_key, "crm")
-    pay_client = UpstreamClient(
-        settings.payments_base_url, settings.payments_api_key, "payments"
-    )
+    pay_client = UpstreamClient(settings.payments_base_url, settings.payments_api_key, "payments")
     registry = ToolRegistry()
     for meta, handler in build_crm_tools(crm_client) + build_payment_tools(pay_client):
         registry.register(meta, handler)
@@ -95,9 +92,7 @@ async def lifespan(app: FastAPI):
         from gateway.approval.telegram import TelegramNotifier
         from gateway.approval.telegram_bot import build_telegram_app
 
-        tg_notifier = TelegramNotifier(
-            settings.telegram_bot_token, settings.telegram_admin_chat_id
-        )
+        tg_notifier = TelegramNotifier(settings.telegram_bot_token, settings.telegram_admin_chat_id)
         notifiers.append(tg_notifier)
         tg_app = build_telegram_app(
             settings.telegram_bot_token,
@@ -219,9 +214,7 @@ async def call_tool(tool_name: str, request: Request):
     payload = await request.json()
     auth_header = request.headers.get("authorization", "")
     token = (
-        auth_header[len("Bearer ") :].strip()
-        if auth_header.lower().startswith("bearer ")
-        else None
+        auth_header[len("Bearer ") :].strip() if auth_header.lower().startswith("bearer ") else None
     )
 
     # Redact BEFORE the pipeline runs so audit always has redacted_params,
@@ -267,13 +260,9 @@ async def call_tool(tool_name: str, request: Request):
     if ctx.result_status == "denied":
         return JSONResponse({"error": str(ctx.error)}, status_code=403, headers=headers)
     if ctx.result_status == "rejected":
-        return JSONResponse(
-            {"error": "approval rejected"}, status_code=403, headers=headers
-        )
+        return JSONResponse({"error": "approval rejected"}, status_code=403, headers=headers)
     if ctx.result_status == "timeout":
-        return JSONResponse(
-            {"error": "approval timeout"}, status_code=408, headers=headers
-        )
+        return JSONResponse({"error": "approval timeout"}, status_code=408, headers=headers)
     if ctx.result_status == "upstream_unavailable":
         return JSONResponse({"error": str(ctx.error)}, status_code=502, headers=headers)
     if ctx.result_status.startswith("upstream_4xx_"):
@@ -281,9 +270,7 @@ async def call_tool(tool_name: str, request: Request):
             status_code = int(ctx.result_status[len("upstream_4xx_") :])
         except ValueError:
             status_code = 502
-        return JSONResponse(
-            {"error": str(ctx.error)}, status_code=status_code, headers=headers
-        )
+        return JSONResponse({"error": str(ctx.error)}, status_code=status_code, headers=headers)
     if ctx.result_status == "upstream_5xx":
         return JSONResponse({"error": str(ctx.error)}, status_code=502, headers=headers)
     if ctx.result_status == "error":

@@ -25,24 +25,20 @@ def build_telegram_app(
             return
         # Reject callbacks from chats other than the configured admin chat to
         # prevent unauthorized approve/reject by anyone who guesses the bot.
-        if admin_chat_id is not None and q.message and q.message.chat:
-            if str(q.message.chat.id) != str(admin_chat_id):
-                await q.answer("Unauthorized", show_alert=True)
-                return
+        if (
+            admin_chat_id is not None
+            and q.message
+            and q.message.chat
+            and str(q.message.chat.id) != str(admin_chat_id)
+        ):
+            await q.answer("Unauthorized", show_alert=True)
+            return
         action, _, approval_id = q.data.partition(":")
         decision = APPROVED if action == "approve" else REJECTED
-        user = (
-            (q.from_user.username or str(q.from_user.id))
-            if q.from_user
-            else "unknown"
-        )
-        ok = await store.decide(
-            UUID(approval_id), decision=decision, decided_by=f"tg:{user}"
-        )
+        user = (q.from_user.username or str(q.from_user.id)) if q.from_user else "unknown"
+        ok = await store.decide(UUID(approval_id), decision=decision, decided_by=f"tg:{user}")
         if ok:
-            await broadcaster.notify_decided(
-                approval_id=UUID(approval_id), status=decision
-            )
+            await broadcaster.notify_decided(approval_id=UUID(approval_id), status=decision)
             await q.answer(f"{decision}", show_alert=False)
             await q.edit_message_reply_markup(reply_markup=None)
         else:

@@ -28,9 +28,7 @@ def make_authorize(evaluator: PolicyEvaluator, session_factory):
         decision = evaluator.evaluate(ctx.role_name, ctx.tool)
         ctx.decision = decision.value
         if decision == Decision.DENY:
-            ctx.error = PermissionError(
-                f"role {ctx.role_name} denied for tool {ctx.tool}"
-            )
+            ctx.error = PermissionError(f"role {ctx.role_name} denied for tool {ctx.tool}")
             ctx.result_status = "denied"
 
     return step

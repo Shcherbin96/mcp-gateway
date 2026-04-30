@@ -20,9 +20,7 @@ GATEWAY = "http://localhost:8000"
 async def test_unsigned_jwt_rejected() -> None:
     """A token using ``alg=none`` must be rejected with HTTP 401."""
     header = (
-        base64.urlsafe_b64encode(
-            json.dumps({"alg": "none", "typ": "JWT"}).encode()
-        )
+        base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode())
         .rstrip(b"=")
         .decode()
     )

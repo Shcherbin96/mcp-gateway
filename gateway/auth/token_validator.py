@@ -9,12 +9,11 @@ from jwt import PyJWKClient
 
 from gateway.auth.exceptions import (
     TokenAudienceMismatch,
+    TokenExpired,
     TokenInvalid,
     TokenIssuerMismatch,
-    TokenExpired,
 )
 from gateway.auth.oauth_models import TokenClaims
-
 
 JWKSProvider = Callable[[], Sequence[tuple[str, Any]]]
 

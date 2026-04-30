@@ -1,11 +1,10 @@
-import pytest
 from uuid import uuid4
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from gateway.audit.writer import AuditWriter
 from gateway.db.models import Tenant
-
 
 pytestmark = pytest.mark.integration
 

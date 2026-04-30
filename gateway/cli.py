@@ -31,9 +31,7 @@ async def seed_demo() -> None:
         roles: dict[str, Role] = {}
         for rname in ("support_agent", "readonly_analyst", "finance_admin"):
             r = (
-                await s.execute(
-                    select(Role).where(Role.tenant_id == tenant.id, Role.name == rname)
-                )
+                await s.execute(select(Role).where(Role.tenant_id == tenant.id, Role.name == rname))
             ).scalar_one_or_none()
             if not r:
                 r = Role(tenant_id=tenant.id, name=rname)

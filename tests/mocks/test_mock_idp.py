@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 
 from mocks.idp.main import app
 
-
 pytestmark = pytest.mark.unit
 
 

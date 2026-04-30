@@ -18,21 +18,28 @@ import os
 import httpx
 from locust import HttpUser, between, events, task
 
-
 IDP = os.environ.get("IDP_URL", "http://localhost:9000")
 
 
 @events.test_start.add_listener
 def fetch_token(environment, **kwargs):
     with httpx.Client() as c:
-        reg = c.post(f"{IDP}/register", json={
-            "client_name": "loadtest", "tenant_id": "00000000-0000-0000-0000-000000000000",
-            "scopes": ["tool:get_customer", "tool:list_orders"],
-        }).json()
-        tok = c.post(f"{IDP}/token", data={
-            "grant_type": "client_credentials",
-            "client_id": reg["client_id"], "client_secret": reg["client_secret"],
-        }).json()
+        reg = c.post(
+            f"{IDP}/register",
+            json={
+                "client_name": "loadtest",
+                "tenant_id": "00000000-0000-0000-0000-000000000000",
+                "scopes": ["tool:get_customer", "tool:list_orders"],
+            },
+        ).json()
+        tok = c.post(
+            f"{IDP}/token",
+            data={
+                "grant_type": "client_credentials",
+                "client_id": reg["client_id"],
+                "client_secret": reg["client_secret"],
+            },
+        ).json()
         environment.parsed_options.token = tok["access_token"]
 
 

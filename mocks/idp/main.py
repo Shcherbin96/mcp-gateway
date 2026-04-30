@@ -19,17 +19,20 @@ from fastapi import FastAPI, Form, HTTPException
 from jwt.algorithms import RSAAlgorithm
 from pydantic import BaseModel
 
-
 # --- Inline key material (was mocks/idp/keys.py) ---------------------------
 
 KID = "mock-idp-key-1"
 
 KEY: rsa.RSAPrivateKey = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
-PUBLIC_PEM: str = KEY.public_key().public_bytes(
-    encoding=serialization.Encoding.PEM,
-    format=serialization.PublicFormat.SubjectPublicKeyInfo,
-).decode()
+PUBLIC_PEM: str = (
+    KEY.public_key()
+    .public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    .decode()
+)
 
 PRIVATE_PEM: bytes = KEY.private_bytes(
     encoding=serialization.Encoding.PEM,

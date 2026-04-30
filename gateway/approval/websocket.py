@@ -32,9 +32,7 @@ class WebSocketBroadcaster:
             for ws in dead:
                 self._connections.discard(ws)
 
-    async def notify_pending(
-        self, *, approval_id: UUID, agent_id: UUID, tool: str, params: dict
-    ):
+    async def notify_pending(self, *, approval_id: UUID, agent_id: UUID, tool: str, params: dict):
         await self._broadcast(
             {
                 "type": "pending",

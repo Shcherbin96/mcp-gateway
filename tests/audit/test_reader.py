@@ -1,12 +1,11 @@
-import pytest
 from uuid import uuid4
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from gateway.audit.reader import AuditFilter, AuditReader
 from gateway.audit.writer import AuditWriter
 from gateway.db.models import Tenant
-
 
 pytestmark = pytest.mark.integration
 
@@ -21,12 +20,8 @@ async def test_tenant_isolation(db_engine):
         a_id, b_id = a.id, b.id
 
     w = AuditWriter(sf)
-    await w.write(
-        tenant_id=a_id, agent_id=None, tool="x", params={}, result_status="success"
-    )
-    await w.write(
-        tenant_id=b_id, agent_id=None, tool="x", params={}, result_status="success"
-    )
+    await w.write(tenant_id=a_id, agent_id=None, tool="x", params={}, result_status="success")
+    await w.write(tenant_id=b_id, agent_id=None, tool="x", params={}, result_status="success")
 
     r = AuditReader(sf)
     page_a = await r.query(AuditFilter(tenant_id=a_id))

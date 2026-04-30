@@ -16,9 +16,7 @@ class TelegramNotifier:
         self._bot = Bot(token=bot_token)
         self._chat_id = admin_chat_id
 
-    async def notify_pending(
-        self, *, approval_id: UUID, agent_id: UUID, tool: str, params: dict
-    ):
+    async def notify_pending(self, *, approval_id: UUID, agent_id: UUID, tool: str, params: dict):
         text = (
             f"🔔 *Pending approval*\n\n"
             f"Tool: `{tool}`\n"
@@ -28,12 +26,8 @@ class TelegramNotifier:
         kb = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton(
-                        "✅ Approve", callback_data=f"approve:{approval_id}"
-                    ),
-                    InlineKeyboardButton(
-                        "❌ Reject", callback_data=f"reject:{approval_id}"
-                    ),
+                    InlineKeyboardButton("✅ Approve", callback_data=f"approve:{approval_id}"),
+                    InlineKeyboardButton("❌ Reject", callback_data=f"reject:{approval_id}"),
                 ]
             ]
         )

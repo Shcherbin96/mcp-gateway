@@ -13,7 +13,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from gateway.auth.exceptions import TokenAudienceMismatch, TokenExpired, TokenInvalid
 from gateway.auth.token_validator import JWKSTokenValidator
 
-
 pytestmark = pytest.mark.unit
 
 

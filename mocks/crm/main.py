@@ -1,12 +1,23 @@
 import os
-from fastapi import FastAPI, HTTPException, Header
+
+from fastapi import FastAPI, Header, HTTPException
 
 API_KEY = os.environ.get("MOCK_CRM_API_KEY", "dev-crm-key")
 
 CUSTOMERS = {
-    "C001": {"id": "C001", "name": "Иванов Иван", "email": "ivanov@example.com", "balance": 12500.0},
+    "C001": {
+        "id": "C001",
+        "name": "Иванов Иван",
+        "email": "ivanov@example.com",
+        "balance": 12500.0,
+    },
     "C002": {"id": "C002", "name": "Петров Петр", "email": "petrov@example.com", "balance": 0.0},
-    "C003": {"id": "C003", "name": "Сидорова Анна", "email": "sidorova@example.com", "balance": 4980.0},
+    "C003": {
+        "id": "C003",
+        "name": "Сидорова Анна",
+        "email": "sidorova@example.com",
+        "balance": 4980.0,
+    },
 }
 ORDERS = {
     "O1234": {"id": "O1234", "customer_id": "C001", "amount": 50000.0, "status": "completed"},

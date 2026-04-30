@@ -50,7 +50,7 @@ async def test_circuit_opens_after_failures():
     c = UpstreamClient("http://t.local", "k", "svc", timeout=1)
     respx.get("http://t.local/x").respond(500)
     for _ in range(5):
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017 - tenacity wraps multiple exception types
             await c.get("/x")
     # Circuit now open — should fail fast
     with pytest.raises(UpstreamUnavailable):

@@ -1,9 +1,9 @@
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class Decision(str, Enum):
+class Decision(StrEnum):
     ALLOW = "allow"
     DENY = "deny"
     REQUIRES_APPROVAL = "requires_approval"

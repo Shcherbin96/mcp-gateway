@@ -78,9 +78,7 @@ async def test_refund_requires_approval_then_rejected(seeded_creds):
         async def reject_after_delay():
             await asyncio.sleep(2)
             async with httpx.AsyncClient(timeout=TIMEOUT) as c2:
-                lst = await c2.get(
-                    f"{GATEWAY}/api/approvals/pending", headers=ADMIN_HEADERS
-                )
+                lst = await c2.get(f"{GATEWAY}/api/approvals/pending", headers=ADMIN_HEADERS)
                 lst.raise_for_status()
                 pending = lst.json()["approvals"]
                 assert pending, "expected at least one pending approval"

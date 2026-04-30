@@ -1,7 +1,8 @@
 """Background task that marks expired pending approvals as TIMEOUT."""
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+import contextlib
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
 
@@ -20,7 +21,7 @@ class TimeoutReaper:
         self._task: asyncio.Task | None = None
 
     async def _tick(self):
-        cutoff = datetime.now(timezone.utc) - timedelta(seconds=self._timeout)
+        cutoff = datetime.now(UTC) - timedelta(seconds=self._timeout)
         async with self._sf() as session:
             res = await session.execute(
                 select(ApprovalRequest.id).where(
@@ -46,9 +47,7 @@ class TimeoutReaper:
                 log.info("approvals_timed_out", count=len(ids))
                 if self._broadcaster:
                     for i in ids:
-                        await self._broadcaster.notify_decided(
-                            approval_id=i, status=TIMEOUT
-                        )
+                        await self._broadcaster.notify_decided(approval_id=i, status=TIMEOUT)
 
     async def _run(self):
         while True:
@@ -64,7 +63,5 @@ class TimeoutReaper:
     async def stop(self):
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
