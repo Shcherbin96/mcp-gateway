@@ -36,9 +36,14 @@ def build_telegram_app(
         action, _, approval_id = q.data.partition(":")
         decision = APPROVED if action == "approve" else REJECTED
         user = (q.from_user.username or str(q.from_user.id)) if q.from_user else "unknown"
-        ok = await store.decide(UUID(approval_id), decision=decision, decided_by=f"tg:{user}")
+        approval_uuid = UUID(approval_id)
+        ok = await store.decide(approval_uuid, decision=decision, decided_by=f"tg:{user}")
         if ok:
-            await broadcaster.notify_decided(approval_id=UUID(approval_id), status=decision)
+            # Look up the tool name so the decision message can use the
+            # tool-specific emoji and label.
+            req = await store.get(approval_uuid)
+            tool = req.tool if req is not None else None
+            await broadcaster.notify_decided(approval_id=approval_uuid, status=decision, tool=tool)
             await q.answer(f"{decision}", show_alert=False)
             await q.edit_message_reply_markup(reply_markup=None)
         else:

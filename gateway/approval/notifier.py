@@ -10,7 +10,9 @@ class ApprovalNotifier(Protocol):
         self, *, approval_id: UUID, agent_id: UUID, tool: str, params: dict
     ) -> None: ...
 
-    async def notify_decided(self, *, approval_id: UUID, status: str) -> None: ...
+    async def notify_decided(
+        self, *, approval_id: UUID, status: str, tool: str | None = None
+    ) -> None: ...
 
 
 class CompositeNotifier:
