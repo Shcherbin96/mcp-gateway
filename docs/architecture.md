@@ -291,7 +291,36 @@ A Postgres superuser can still bypass GRANTs, so the trigger is the second line 
 
 ---
 
-## 5. References
+## 5. Streamable HTTP transport
+
+The gateway exposes the MCP **Streamable HTTP** transport (spec revision `2025-06-18`) at a single endpoint:
+
+```
+POST /mcp/rpc
+Content-Type: application/json
+Authorization: Bearer <jwt>            # required for tools/call
+Mcp-Session-Id: <opaque>               # echoed; minted on initialize
+```
+
+The body is a JSON-RPC 2.0 request. Supported methods:
+
+| Method | Purpose | Notes |
+|---|---|---|
+| `initialize` | Handshake | Returns `protocolVersion`, capabilities `{tools: {}}`, `serverInfo`. Mints a fresh `Mcp-Session-Id` response header. |
+| `notifications/initialized` | Client → server notification | No response body, HTTP 202. |
+| `tools/list` | Tool catalog | Same content as the legacy `GET /mcp/tools`. |
+| `tools/call` | Invoke a tool | Runs the full 5-layer pipeline. Result wraps the upstream payload as `{content: [{type: "text", text: "<json>"}], isError: <bool>}`. |
+| `ping` | Liveness | `{}` result. |
+
+Errors travel inside the JSON-RPC envelope (`{jsonrpc, id, error: {code, message, data}}`) with HTTP 200, except for unparseable bodies (HTTP 400) and `GET /mcp/rpc` (HTTP 405 — server-initiated streaming is not implemented). Authentication, authorization, approval, and audit failures all surface through the standard pipeline result statuses; the transport renders them into either an HTTP status (legacy REST) or `isError: true` (MCP).
+
+The legacy REST endpoints `GET /mcp/tools` and `POST /mcp/call/{tool_name}` remain available and share the same `invoke_tool` pipeline helper — they are a strict subset of what `/mcp/rpc` exposes.
+
+For client configuration examples (stdio proxy + direct HTTP), see `demo/claude_desktop_config.json`.
+
+---
+
+## 6. References
 
 - Spec: `docs/superpowers/specs/2026-04-29-mcp-gateway-design.md`
 - Plan: `docs/superpowers/plans/2026-04-29-mcp-gateway.md`

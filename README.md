@@ -149,7 +149,12 @@ docker compose -f docker-compose.observability.yml up -d
 
 ## Configure Claude Desktop
 
-After `make seed`, copy the printed `client_id` / `client_secret`, exchange for a token at `http://localhost:9000/token`, then point Claude Desktop at the gateway. See `demo/claude_desktop_config.json`.
+After `make seed`, copy the printed `client_id` / `client_secret`, exchange for a token at `http://localhost:9000/token`, then point Claude Desktop at the gateway. See `demo/claude_desktop_config.json` for both supported patterns:
+
+- **Stdio proxy** (`gateway.mcp_stdio_proxy`) — universally supported by every MCP client today. The proxy holds OAuth credentials and exchanges them for short-lived JWTs against the gateway.
+- **Direct Streamable HTTP** (`POST /mcp/rpc`) — MCP 2025-06-18 transport. Use it from any client that speaks streamable-http natively. The endpoint is the single chokepoint and runs the full 5-layer pipeline.
+
+See `docs/architecture.md` § "Streamable HTTP transport" for the full request/response shape.
 
 ---
 

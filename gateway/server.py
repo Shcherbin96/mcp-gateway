@@ -1,7 +1,6 @@
 """FastAPI app entrypoint — wires middleware, tools, approvals, audit, and web UI."""
 
 import contextlib
-import time
 from pathlib import Path
 from uuid import UUID
 
@@ -23,19 +22,20 @@ from gateway.auth.token_validator import JWKSTokenValidator
 from gateway.config import get_settings
 from gateway.db.models import Tenant
 from gateway.db.session import engine
+from gateway.mcp_http import make_mcp_http_router
 from gateway.middleware.approve import make_approve
 from gateway.middleware.audit import make_audit
 from gateway.middleware.authenticate import make_authenticate
 from gateway.middleware.authorize import make_authorize
-from gateway.middleware.chain import CallContext, Pipeline
+from gateway.middleware.chain import Pipeline
 from gateway.middleware.execute import make_execute
 from gateway.middleware.rate_limit import RateLimiter
 from gateway.observability.logging import configure_logging, get_logger
-from gateway.observability.metrics import REQUEST_DURATION, REQUESTS_TOTAL
 from gateway.observability.tracing import configure_tracing
 from gateway.policy.evaluator import PolicyEvaluator
 from gateway.policy.loader import load_policies
 from gateway.tools.crm import build_crm_tools
+from gateway.tools.dispatch import invoke_tool
 from gateway.tools.payments import build_payment_tools
 from gateway.tools.registry import ToolRegistry
 from gateway.tools.upstream import UpstreamClient
@@ -158,6 +158,12 @@ async def lifespan(app: FastAPI):
         )
     )
 
+    # MCP Streamable HTTP transport (single endpoint at /mcp/rpc).
+    # Mounted lazily inside lifespan because the legacy /mcp/tools and
+    # /mcp/call/{tool_name} routes below depend on app.state.* being populated
+    # — same lifecycle expectation applies here.
+    app.include_router(make_mcp_http_router())
+
     try:
         yield
     finally:
@@ -189,7 +195,12 @@ app = FastAPI(
     openapi_tags=[
         {
             "name": "MCP",
-            "description": "Model Context Protocol endpoints — tool catalog and dispatch.",
+            "description": (
+                "Model Context Protocol endpoints. ``/mcp/rpc`` is the spec-compliant "
+                "Streamable HTTP transport (MCP 2025-06-18). ``/mcp/tools`` and "
+                "``/mcp/call/{tool_name}`` are the legacy REST surface — kept for "
+                "backward compatibility, prefer ``/mcp/rpc`` for new clients."
+            ),
         },
         {"name": "Approvals", "description": "Human-in-the-loop approval flow (admin-only)."},
         {"name": "Audit", "description": "Append-only audit log query API (admin-only)."},
@@ -228,7 +239,11 @@ async def metrics():
     return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.get("/mcp/tools", tags=["MCP"], summary="List available tools (JSON Schema)")
+@app.get(
+    "/mcp/tools",
+    tags=["MCP"],
+    summary="List available tools (legacy REST — prefer /mcp/rpc tools/list)",
+)
 async def list_tools(request: Request):
     return {
         "tools": [
@@ -245,7 +260,7 @@ async def list_tools(request: Request):
 @app.post(
     "/mcp/call/{tool_name}",
     tags=["MCP"],
-    summary="Invoke a tool (passes through 5-layer pipeline)",
+    summary="Invoke a tool — legacy REST surface (prefer /mcp/rpc tools/call)",
 )
 async def call_tool(tool_name: str, request: Request):
     payload = await request.json()
@@ -253,81 +268,22 @@ async def call_tool(tool_name: str, request: Request):
     token = (
         auth_header[len("Bearer ") :].strip() if auth_header.lower().startswith("bearer ") else None
     )
-
-    # Rate limit BEFORE expensive pipeline work — keyed by JWT sub or client IP.
-    limiter: RateLimiter = request.app.state.rate_limiter
     client_ip = request.client.host if request.client else None
-    rl_key = RateLimiter.key_from_token(token, client_ip)
-    allowed, retry_after = await limiter.check(rl_key)
-    if not allowed:
-        log.info("rate_limit_exceeded", key=rl_key, tool=tool_name, retry_after=retry_after)
-        return JSONResponse(
-            {"error": "rate_limit_exceeded", "retry_after": retry_after},
-            status_code=429,
-            headers={"Retry-After": str(int(retry_after))},
-        )
 
-    # Redact BEFORE the pipeline runs so audit always has redacted_params,
-    # even when authentication or other early steps fail.
-    rt = request.app.state.registry.get(tool_name)
-    redact_fn = rt.meta.redact if rt else (lambda p: dict(p))
-    redacted = redact_fn(payload)
-
-    ctx = CallContext(
+    outcome = await invoke_tool(
+        app_state=request.app.state,
+        tool_name=tool_name,
+        payload=payload,
         token=token,
-        tool=tool_name,
-        params=dict(payload),
-        redacted_params=redacted,
+        client_ip=client_ip,
     )
 
-    pipeline: Pipeline = request.app.state.pipeline
-    audit_step = request.app.state.audit_step
-
-    started = time.monotonic()
-    try:
-        await pipeline.run(ctx)
-    finally:
-        try:
-            await audit_step(ctx)
-        except Exception as e:
-            log.error("audit_failed", error=str(e), trace_id=ctx.trace_id)
-            return JSONResponse(
-                {"error": "audit_failure", "trace_id": ctx.trace_id},
-                status_code=500,
-                headers={"X-Trace-Id": ctx.trace_id},
-            )
-        duration = time.monotonic() - started
-        REQUEST_DURATION.labels(tool=tool_name).observe(duration)
-        REQUESTS_TOTAL.labels(
-            tool=tool_name,
-            status=ctx.result_status,
-            tenant=str(ctx.tenant_id) if ctx.tenant_id else "none",
-        ).inc()
-
-    headers = {"X-Trace-Id": ctx.trace_id}
-    if ctx.result_status == "auth_failed":
-        return JSONResponse({"error": str(ctx.error)}, status_code=401, headers=headers)
-    if ctx.result_status == "denied":
-        return JSONResponse({"error": str(ctx.error)}, status_code=403, headers=headers)
-    if ctx.result_status == "rejected":
-        return JSONResponse({"error": "approval rejected"}, status_code=403, headers=headers)
-    if ctx.result_status == "timeout":
-        return JSONResponse({"error": "approval timeout"}, status_code=408, headers=headers)
-    if ctx.result_status == "upstream_unavailable":
-        return JSONResponse({"error": str(ctx.error)}, status_code=502, headers=headers)
-    if ctx.result_status.startswith("upstream_4xx_"):
-        try:
-            status_code = int(ctx.result_status[len("upstream_4xx_") :])
-        except ValueError:
-            status_code = 502
-        return JSONResponse({"error": str(ctx.error)}, status_code=status_code, headers=headers)
-    if ctx.result_status == "upstream_5xx":
-        return JSONResponse({"error": str(ctx.error)}, status_code=502, headers=headers)
-    if ctx.result_status == "error":
+    if outcome.rate_limited:
         return JSONResponse(
-            {"error": str(ctx.error), "trace_id": ctx.trace_id},
-            status_code=500,
-            headers=headers,
+            outcome.body,
+            status_code=429,
+            headers={"Retry-After": str(int(outcome.retry_after))},
         )
 
-    return JSONResponse(ctx.result or {}, headers=headers)
+    headers = {"X-Trace-Id": outcome.trace_id} if outcome.trace_id else {}
+    return JSONResponse(outcome.body, status_code=outcome.http_status, headers=headers)

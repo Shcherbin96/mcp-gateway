@@ -38,9 +38,12 @@ from typing import Any
 
 import httpx
 
-PROTOCOL_VERSION = "2024-11-05"
+PROTOCOL_VERSION = "2025-06-18"
 SERVER_NAME = "mcp-gateway-proxy"
 SERVER_VERSION = "0.1.0"
+
+# Single endpoint for the gateway's MCP Streamable HTTP transport.
+RPC_PATH = "/mcp/rpc"
 
 GATEWAY_URL = os.environ.get("MCP_GATEWAY_URL", "http://localhost:8000").rstrip("/")
 ISSUER = os.environ.get("MCP_GATEWAY_OAUTH_ISSUER", "http://localhost:9000").rstrip("/")
@@ -85,7 +88,32 @@ async def _get_token(client: httpx.AsyncClient) -> str:
     return _token
 
 
+async def _rpc(
+    client: httpx.AsyncClient,
+    method: str,
+    *,
+    params: dict | None = None,
+    req_id: Any = 1,
+    token: str | None = None,
+    timeout: float = 30.0,
+) -> dict:
+    """POST a JSON-RPC envelope to the gateway's /mcp/rpc endpoint."""
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    body: dict[str, Any] = {"jsonrpc": "2.0", "id": req_id, "method": method}
+    if params is not None:
+        body["params"] = params
+    resp = await client.post(
+        f"{GATEWAY_URL}{RPC_PATH}", json=body, headers=headers, timeout=timeout
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 async def handle_initialize(req_id: Any) -> dict:
+    # Local response — Claude Desktop talks to us, we identify ourselves as
+    # the proxy. The downstream gateway's protocolVersion is the same.
     return {
         "jsonrpc": "2.0",
         "id": req_id,
@@ -98,47 +126,29 @@ async def handle_initialize(req_id: Any) -> dict:
 
 
 async def handle_tools_list(req_id: Any, client: httpx.AsyncClient) -> dict:
-    resp = await client.get(f"{GATEWAY_URL}/mcp/tools", timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
-    tools = [
-        {
-            "name": t["name"],
-            "description": t.get("description", ""),
-            "inputSchema": t.get("inputSchema", {"type": "object"}),
-        }
-        for t in data.get("tools", [])
-    ]
-    return {"jsonrpc": "2.0", "id": req_id, "result": {"tools": tools}}
+    envelope = await _rpc(client, "tools/list", req_id=req_id, timeout=10)
+    if "error" in envelope:
+        return {"jsonrpc": "2.0", "id": req_id, "error": envelope["error"]}
+    return {"jsonrpc": "2.0", "id": req_id, "result": envelope.get("result", {"tools": []})}
 
 
 async def handle_tools_call(req_id: Any, params: dict, client: httpx.AsyncClient) -> dict:
     name = params.get("name")
-    arguments = params.get("arguments", {})
     if not name:
         return _error(req_id, -32602, "missing tool name")
     token = await _get_token(client)
-    resp = await client.post(
-        f"{GATEWAY_URL}/mcp/call/{name}",
-        json=arguments,
-        headers={"Authorization": f"Bearer {token}"},
+    envelope = await _rpc(
+        client,
+        "tools/call",
+        params=params,
+        req_id=req_id,
+        token=token,
         timeout=600,  # approval flow may block for minutes
     )
-    body: Any
-    try:
-        body = resp.json()
-    except Exception:
-        body = {"text": resp.text}
-    is_error = resp.status_code >= 400
-    text = json.dumps(body, indent=2, ensure_ascii=False)
-    return {
-        "jsonrpc": "2.0",
-        "id": req_id,
-        "result": {
-            "content": [{"type": "text", "text": text}],
-            "isError": is_error,
-        },
-    }
+    if "error" in envelope:
+        return {"jsonrpc": "2.0", "id": req_id, "error": envelope["error"]}
+    # The gateway already returns the MCP-shaped {content, isError} payload.
+    return {"jsonrpc": "2.0", "id": req_id, "result": envelope.get("result", {})}
 
 
 def _error(req_id: Any, code: int, message: str) -> dict:

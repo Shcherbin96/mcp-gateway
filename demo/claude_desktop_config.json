@@ -1,6 +1,8 @@
 {
+  "_comment_universal": "Pattern A — stdio proxy. Universally supported by every MCP client (Claude Desktop today, Cursor, Continue). The proxy holds OAuth credentials locally and exchanges them for short-lived JWTs.",
+  "_comment_direct_http": "Pattern B — direct HTTP via the MCP Streamable HTTP transport at /mcp/rpc (MCP 2025-06-18). Use it when your client supports the streamable-http transport directly. As of 2026-04-30 not every desktop client speaks streamable-http natively, so Pattern A remains the safe default.",
   "mcpServers": {
-    "mcp-gateway": {
+    "mcp-gateway-stdio": {
       "command": "/path/to/mcp-gateway/.venv/bin/python",
       "args": ["-m", "gateway.mcp_stdio_proxy"],
       "env": {
@@ -9,6 +11,13 @@
         "MCP_GATEWAY_OAUTH_ISSUER": "http://localhost:9000",
         "MCP_GATEWAY_CLIENT_ID": "<paste client_id printed by `make seed`>",
         "MCP_GATEWAY_CLIENT_SECRET": "<paste client_secret printed by `make seed`>"
+      }
+    },
+    "mcp-gateway-http": {
+      "transport": "streamable-http",
+      "url": "http://localhost:8000/mcp/rpc",
+      "headers": {
+        "Authorization": "Bearer <static JWT or token issued by `make seed`>"
       }
     }
   }
