@@ -168,7 +168,27 @@ async def lifespan(app: FastAPI):
             await pay_client.aclose()
 
 
-app = FastAPI(title="MCP Gateway", lifespan=lifespan)
+app = FastAPI(
+    title="MCP Gateway",
+    description=(
+        "Production-grade Model Context Protocol gateway. "
+        "Every tool call passes through 5 control layers: "
+        "authenticate → authorize → approve → execute → audit."
+    ),
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_tags=[
+        {
+            "name": "MCP",
+            "description": "Model Context Protocol endpoints — tool catalog and dispatch.",
+        },
+        {"name": "Approvals", "description": "Human-in-the-loop approval flow (admin-only)."},
+        {"name": "Audit", "description": "Append-only audit log query API (admin-only)."},
+        {"name": "Operations", "description": "Health, readiness, Prometheus metrics."},
+    ],
+)
 app.mount(
     "/static",
     StaticFiles(directory=str(Path(__file__).parent / "web" / "static")),
@@ -176,12 +196,12 @@ app.mount(
 )
 
 
-@app.get("/healthz")
+@app.get("/healthz", tags=["Operations"], summary="Liveness probe")
 async def healthz():
     return {"status": "ok"}
 
 
-@app.get("/readyz")
+@app.get("/readyz", tags=["Operations"], summary="Readiness probe (checks DB)")
 async def readyz():
     try:
         async with engine.connect() as conn:
@@ -191,12 +211,17 @@ async def readyz():
         raise HTTPException(503, "db_unavailable") from e
 
 
-@app.get("/metrics")
+@app.get(
+    "/metrics",
+    tags=["Operations"],
+    summary="Prometheus metrics",
+    response_class=PlainTextResponse,
+)
 async def metrics():
     return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.get("/mcp/tools")
+@app.get("/mcp/tools", tags=["MCP"], summary="List available tools (JSON Schema)")
 async def list_tools(request: Request):
     return {
         "tools": [
@@ -210,7 +235,11 @@ async def list_tools(request: Request):
     }
 
 
-@app.post("/mcp/call/{tool_name}")
+@app.post(
+    "/mcp/call/{tool_name}",
+    tags=["MCP"],
+    summary="Invoke a tool (passes through 5-layer pipeline)",
+)
 async def call_tool(tool_name: str, request: Request):
     payload = await request.json()
     auth_header = request.headers.get("authorization", "")

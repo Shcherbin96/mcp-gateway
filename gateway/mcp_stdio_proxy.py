@@ -29,6 +29,7 @@ Usage (claude_desktop_config.json):
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import sys
@@ -54,7 +55,7 @@ _token_exp: float = 0.0
 
 def _log(msg: str) -> None:
     """Diagnostics go to stderr — stdout is reserved for JSON-RPC frames."""
-    print(f"[mcp-proxy] {msg}", file=sys.stderr, flush=True)
+    print(f"[mcp-proxy] {msg}", file=sys.stderr, flush=True)  # noqa: T201 — intentional stderr diagnostic
 
 
 async def _get_token(client: httpx.AsyncClient) -> str:
@@ -190,10 +191,8 @@ async def main_async() -> None:
 
 
 def main() -> None:
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(main_async())
-    except KeyboardInterrupt:
-        pass
 
 
 if __name__ == "__main__":

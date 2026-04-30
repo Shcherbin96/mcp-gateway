@@ -133,11 +133,12 @@ def make_router(
         request: Request,
         admin: str = Depends(_require_admin),
     ):
+        tid = await _tenant_id()
         async with session_factory() as s:
             res = await s.execute(
                 select(ApprovalRequest)
                 .where(
-                    ApprovalRequest.tenant_id == default_tenant_id,
+                    ApprovalRequest.tenant_id == tid,
                     ApprovalRequest.status == PENDING,
                 )
                 .order_by(ApprovalRequest.created_at.desc())
@@ -151,11 +152,12 @@ def make_router(
 
     @r.get("/api/approvals/pending")
     async def pending_api(_admin: str = Depends(_require_admin)):
+        tid = await _tenant_id()
         async with session_factory() as s:
             res = await s.execute(
                 select(ApprovalRequest)
                 .where(
-                    ApprovalRequest.tenant_id == default_tenant_id,
+                    ApprovalRequest.tenant_id == tid,
                     ApprovalRequest.status == PENDING,
                 )
                 .order_by(ApprovalRequest.created_at.desc())
