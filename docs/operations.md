@@ -297,6 +297,28 @@ Until this lands, archive the Postgres audit table with the standard `pg_dump --
 
 ---
 
+## 7. Tenant isolation
+
+Tenant scoping is enforced **manually per-query** (via `where(...tenant_id == X)` in repositories) rather than via SQLAlchemy event hooks. The `gateway.tenants.middleware.current_tenant()` ContextVar is populated by the `authenticate` middleware after JWT verification, but it is **informational only** — nothing in the ORM layer reads it automatically.
+
+> **Adding a new query that touches tenant-scoped tables MUST include `where(...tenant_id == current_tenant())` (or an equivalent explicit `tenant_id` filter passed in by the caller). There is no automatic enforcement.**
+
+Reviewers should treat any new SQL or `select(...)` statement against `agents`, `roles`, `audit_log`, `approvals`, or `oauth_clients` as a tenant-isolation hotspot during code review. The `current_tenant()` helper raises if accessed before authentication completes, which is a useful assertion for handlers that must never run cross-tenant.
+
+---
+
+## 8. Known limitations
+
+These are deliberate scope cuts, documented so operators and contributors know what is *not* in the box:
+
+- **PolicyEvaluator does not inspect params.** Decisions are role × tool only — there is no way to express "amount > $1000 requires approval" or "only allow `delete_customer` if `customer.plan == 'free'`". To add this, extend `RolePolicy` schema with `conditions: list[Condition]` and update `PolicyEvaluator.evaluate(role, tool, params)` to evaluate them. The middleware already passes `ctx.params` through to the evaluator call site, so wiring this up is mechanical.
+- **Single-tenant Web UI.** The dashboard shows only the first tenant returned by the database. To support multi-tenant browsing, add a `?tenant_id=` query parameter and an admin-role check on the corresponding endpoints.
+- **Approval polling, not LISTEN/NOTIFY.** The `approve` middleware polls the `approvals` table every 1s (`MCP_APPROVAL_POLL_INTERVAL_SECONDS`) waiting for a decision. For higher-throughput deployments, swap the poll loop for a Postgres `LISTEN`/`NOTIFY` subscription on an `approval_decisions` channel.
+- **No rate limiting per agent or tenant.** A misbehaving agent can saturate the gateway. Place a reverse proxy (nginx, Envoy, Cloudflare) in front for now, or add a token-bucket middleware before `authenticate`.
+- **No automatic SQLAlchemy tenant filtering.** See section 7 above — every query must include `where(...tenant_id == ...)` manually.
+
+---
+
 ## References
 
 - Architecture: `docs/architecture.md`

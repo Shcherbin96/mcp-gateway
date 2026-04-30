@@ -6,6 +6,7 @@ from gateway.auth.exceptions import TokenError
 from gateway.auth.token_validator import TokenValidator
 from gateway.middleware.chain import CallContext
 from gateway.observability.logging import get_logger
+from gateway.tenants.middleware import set_tenant
 
 log = get_logger(__name__)
 
@@ -29,5 +30,6 @@ def make_authenticate(validator: TokenValidator):
             (s.split(":", 1)[1] for s in claims.scopes if s.startswith("role:")),
             None,
         )
+        set_tenant(claims.tenant_id)
 
     return step

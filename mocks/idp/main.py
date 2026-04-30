@@ -58,7 +58,7 @@ def metadata() -> dict[str, Any]:
         "registration_endpoint": f"{ISSUER}/register",
         "jwks_uri": f"{ISSUER}/jwks",
         "response_types_supported": ["code"],
-        "grant_types_supported": ["client_credentials", "authorization_code"],
+        "grant_types_supported": ["client_credentials"],
         "token_endpoint_auth_methods_supported": [
             "client_secret_basic",
             "client_secret_post",
@@ -137,6 +137,14 @@ def token(
         "expires_in": 3600,
         "scope": " ".join(granted_scopes),
     }
+
+
+@app.get("/authorize")
+def authorize() -> dict[str, str]:
+    raise HTTPException(
+        status_code=501,
+        detail="authorization_code flow not implemented in mock IdP — use client_credentials",
+    )
 
 
 @app.get("/healthz")
