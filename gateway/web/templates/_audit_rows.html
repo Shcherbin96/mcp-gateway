@@ -1,15 +1,54 @@
-<table>
-  <thead><tr><th>Time</th><th>Agent</th><th>Tool</th><th>Status</th><th>Trace</th></tr></thead>
-  <tbody>
-  {% for e in entries %}
-    <tr>
-      <td>{{ e.created_at.isoformat() }}</td>
-      <td>{{ e.agent_id or "-" }}</td>
-      <td>{{ e.tool or "-" }}</td>
-      <td class="status-{{ e.result_status }}">{{ e.result_status }}</td>
-      <td><code>{{ e.trace_id or "-" }}</code></td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-<p>Total: {{ total }}</p>
+{% if entries %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 12ch;">Time</th>
+        <th>Agent</th>
+        <th>Tool</th>
+        <th style="width: 10ch;">Status</th>
+        <th>Params</th>
+        <th>Result</th>
+        <th style="width: 12ch;">Trace</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for e in entries %}
+      <tr>
+        <td title="{{ e.created_at.isoformat() }}">{{ e.created_at.strftime("%d %b %H:%M:%S") }}</td>
+        <td>{% if e.agent_id %}<code>{{ (e.agent_id|string)[:8] }}</code>{% else %}<span style="color:#94a3b8">—</span>{% endif %}</td>
+        <td><strong>{{ e.tool or "—" }}</strong></td>
+        <td><span class="badge badge-{{ e.result_status }}">{{ e.result_status }}</span></td>
+        <td>
+          {% if e.params_json %}
+            <details>
+              <summary>params</summary>
+              <pre>{{ e.params_json | tojson(indent=2) }}</pre>
+            </details>
+          {% else %}<span style="color:#94a3b8">—</span>{% endif %}
+        </td>
+        <td>
+          {% if e.result_json %}
+            <details>
+              <summary>result</summary>
+              <pre>{{ e.result_json | tojson(indent=2) }}</pre>
+            </details>
+          {% else %}<span style="color:#94a3b8">—</span>{% endif %}
+        </td>
+        <td>
+          {% if e.trace_id %}
+            <code title="{{ e.trace_id }}">{{ e.trace_id[:8] }}</code>
+          {% else %}<span style="color:#94a3b8">—</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="table-meta">{{ entries|length }} of {{ total }} entries</div>
+</div>
+{% else %}
+<div class="empty-state">
+  <strong>No audit entries yet</strong>
+  Try invoking a tool — every call shows up here.
+</div>
+{% endif %}

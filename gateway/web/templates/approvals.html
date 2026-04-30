@@ -1,10 +1,62 @@
 {% extends "base.html" %}
-{% block title %}Approvals{% endblock %}
+{% block title %}Approvals · MCP Gateway{% endblock %}
 {% block content %}
-<h2>Pending approvals</h2>
-<div id="list" hx-get="/approvals/list" hx-trigger="load, every 3s, refresh"></div>
+<h2 class="page-title">
+  Pending approvals
+  <span id="count-badge" class="count-badge zero">0 pending</span>
+</h2>
+
+<div id="list"
+     hx-get="/approvals/list"
+     hx-trigger="load, every 5s, refresh"
+     hx-swap="innerHTML">
+  <div class="empty-state">Loading…</div>
+</div>
+
 <script>
-  const ws = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/approvals/ws`);
-  ws.onmessage = () => htmx.trigger("#list", "refresh");
+  const ADMIN_TOKEN = "{{ admin_token | e }}";
+
+  // Update the "N pending" badge whenever the list refreshes.
+  document.addEventListener("htmx:afterSwap", (ev) => {
+    if (ev.target && ev.target.id === "list") {
+      const ul = ev.target.querySelector("ul.approvals");
+      const n = ul ? parseInt(ul.dataset.count || "0", 10) : 0;
+      const badge = document.getElementById("count-badge");
+      if (badge) {
+        badge.textContent = `${n} pending`;
+        badge.classList.toggle("zero", n === 0);
+      }
+    }
+  });
+
+  (function connectWS() {
+    if (!ADMIN_TOKEN) return; // demo: no token configured → skip realtime
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const url = `${proto}//${location.host}/approvals/ws?token=${encodeURIComponent(ADMIN_TOKEN)}`;
+    let ws;
+    try { ws = new WebSocket(url); } catch (e) { return; }
+
+    ws.onmessage = (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch (_) { return; }
+
+      if (msg.type === "decided") {
+        const card = document.querySelector(`[data-approval-id="${msg.approval_id}"]`);
+        if (card) {
+          card.classList.add("fade-out");
+          setTimeout(() => htmx.trigger("#list", "refresh"), 300);
+        } else {
+          htmx.trigger("#list", "refresh");
+        }
+      } else if (msg.type === "pending") {
+        htmx.trigger("#list", "refresh");
+      }
+    };
+
+    ws.onclose = () => {
+      // Lightweight auto-reconnect after a short backoff.
+      setTimeout(connectWS, 2000);
+    };
+  })();
 </script>
 {% endblock %}

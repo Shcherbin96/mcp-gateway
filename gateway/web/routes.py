@@ -124,7 +124,11 @@ def make_router(
 
     @r.get("/audit", response_class=HTMLResponse)
     async def audit_page(request: Request):
-        return templates.TemplateResponse(request, "audit.html", {})
+        return templates.TemplateResponse(
+            request,
+            "audit.html",
+            {"admin_token": settings.web_admin_token or ""},
+        )
 
     @r.get("/audit/rows", response_class=HTMLResponse)
     async def audit_rows(
@@ -198,7 +202,11 @@ def make_router(
 
     @r.get("/approvals", response_class=HTMLResponse)
     async def approvals_page(request: Request):
-        return templates.TemplateResponse(request, "approvals.html", {})
+        return templates.TemplateResponse(
+            request,
+            "approvals.html",
+            {"admin_token": settings.web_admin_token or ""},
+        )
 
     @r.get("/approvals/list", response_class=HTMLResponse)
     async def approvals_list(

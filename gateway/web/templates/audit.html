@@ -1,19 +1,37 @@
 {% extends "base.html" %}
-{% block title %}Audit{% endblock %}
+{% block title %}Audit · MCP Gateway{% endblock %}
 {% block content %}
-<h2>Audit log</h2>
-<form hx-get="/audit/rows" hx-target="#rows" hx-trigger="change, submit">
-  <input name="agent_id" placeholder="Agent ID">
-  <input name="tool" placeholder="Tool">
-  <select name="result_status">
-    <option value="">— any status —</option>
-    <option value="success">success</option>
-    <option value="denied">denied</option>
-    <option value="rejected">rejected</option>
-    <option value="timeout">timeout</option>
-    <option value="error">error</option>
-  </select>
-  <button type="submit">Filter</button>
+<h2 class="page-title">Audit log</h2>
+
+<form class="filter-form" hx-get="/audit/rows" hx-target="#rows" hx-trigger="change, submit" hx-swap="innerHTML">
+  <div class="field">
+    <label for="f-agent">Agent ID</label>
+    <input id="f-agent" name="agent_id" placeholder="UUID or blank">
+  </div>
+  <div class="field">
+    <label for="f-tool">Tool</label>
+    <input id="f-tool" name="tool" placeholder="e.g. get_customer">
+  </div>
+  <div class="field">
+    <label for="f-status">Status</label>
+    <select id="f-status" name="result_status">
+      <option value="">— any status —</option>
+      <option value="success">success</option>
+      <option value="denied">denied</option>
+      <option value="rejected">rejected</option>
+      <option value="pending">pending</option>
+      <option value="timeout">timeout</option>
+      <option value="error">error</option>
+      <option value="auth_failed">auth_failed</option>
+    </select>
+  </div>
+  <div class="field" style="min-width:auto;">
+    <label>&nbsp;</label>
+    <button type="submit">Apply filters</button>
+  </div>
 </form>
-<div id="rows" hx-get="/audit/rows" hx-trigger="load, refresh">Loading…</div>
+
+<div id="rows" hx-get="/audit/rows" hx-trigger="load, refresh" hx-swap="innerHTML">
+  <div class="empty-state">Loading…</div>
+</div>
 {% endblock %}

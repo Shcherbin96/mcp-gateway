@@ -1,14 +1,39 @@
 {% if approvals %}
-<ul>
+<ul class="approvals" data-count="{{ approvals|length }}">
   {% for a in approvals %}
-    <li class="approval">
-      <strong>{{ a.tool }}</strong> by agent <code>{{ a.agent_id }}</code><br>
+    <li class="approval" data-approval-id="{{ a.id }}">
+      <div class="approval-head">
+        <span class="badge badge-pending">pending</span>
+        <span class="approval-tool">{{ a.tool }}</span>
+        <span class="approval-meta">
+          <span>agent <code>{{ (a.agent_id|string)[:8] }}</code></span>
+          <span title="{{ a.created_at.isoformat() }}">requested at {{ a.created_at.strftime("%H:%M:%S") }}</span>
+        </span>
+      </div>
       <pre>{{ a.params_json | tojson(indent=2) }}</pre>
-      <button hx-post="/approvals/{{ a.id }}/decide?decision=approved&decided_by={{ user }}" hx-target="closest li" hx-swap="outerHTML">Approve</button>
-      <button hx-post="/approvals/{{ a.id }}/decide?decision=rejected&decided_by={{ user }}" hx-target="closest li" hx-swap="outerHTML">Reject</button>
+      <div class="approval-actions">
+        <button
+          hx-post="/approvals/{{ a.id }}/decide?decision=approved&decided_by={{ user }}"
+          hx-target="closest li"
+          hx-swap="outerHTML swap:300ms"
+          onclick="this.closest('li').classList.add('fade-out')">
+          Approve
+        </button>
+        <button
+          class="danger"
+          hx-post="/approvals/{{ a.id }}/decide?decision=rejected&decided_by={{ user }}"
+          hx-target="closest li"
+          hx-swap="outerHTML swap:300ms"
+          onclick="this.closest('li').classList.add('fade-out')">
+          Reject
+        </button>
+      </div>
     </li>
   {% endfor %}
 </ul>
 {% else %}
-<p>No pending approvals.</p>
+<div class="empty-state">
+  <strong>All clear</strong>
+  No pending approvals — everything in flight has been decided.
+</div>
 {% endif %}
