@@ -6,7 +6,12 @@ roles:
       - tool: list_orders
       - tool: update_order
       - tool: refund_payment
-        requires_approval: true
+        # Approval required only for refunds over $1000; smaller refunds run
+        # straight through. Conditions are OR-combined: any match → approval.
+        requires_approval:
+          - param: amount
+            op: gt
+            value: 1000
   - name: readonly_analyst
     tools:
       - tool: get_customer

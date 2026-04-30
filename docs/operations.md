@@ -311,10 +311,9 @@ Reviewers should treat any new SQL or `select(...)` statement against `agents`, 
 
 These are deliberate scope cuts, documented so operators and contributors know what is *not* in the box:
 
-- **PolicyEvaluator does not inspect params.** Decisions are role × tool only — there is no way to express "amount > $1000 requires approval" or "only allow `delete_customer` if `customer.plan == 'free'`". To add this, extend `RolePolicy` schema with `conditions: list[Condition]` and update `PolicyEvaluator.evaluate(role, tool, params)` to evaluate them. The middleware already passes `ctx.params` through to the evaluator call site, so wiring this up is mechanical.
 - **Single-tenant Web UI.** The dashboard shows only the first tenant returned by the database. To support multi-tenant browsing, add a `?tenant_id=` query parameter and an admin-role check on the corresponding endpoints.
-- **Approval polling, not LISTEN/NOTIFY.** The `approve` middleware polls the `approvals` table every 1s (`MCP_APPROVAL_POLL_INTERVAL_SECONDS`) waiting for a decision. For higher-throughput deployments, swap the poll loop for a Postgres `LISTEN`/`NOTIFY` subscription on an `approval_decisions` channel.
-- **No rate limiting per agent or tenant.** A misbehaving agent can saturate the gateway. Place a reverse proxy (nginx, Envoy, Cloudflare) in front for now, or add a token-bucket middleware before `authenticate`.
+- **Approval wake-up uses LISTEN/NOTIFY with 5s poll fallback.** `decide()` issues `NOTIFY mcp_approval_decided, '<id>:<status>'` in the same transaction that mutates the row; `wait_for_decision()` opens a fresh asyncpg connection and `LISTEN`s for the matching id, racing against a slower poll loop (`MCP_APPROVAL_POLL_INTERVAL_SECONDS`, default 5s) that exists only to bridge brief failover gaps when a NOTIFY might be missed.
+- **In-process rate limiting only.** A simple in-memory token-bucket caps `POST /mcp/call/*` at `MCP_RATE_LIMIT_PER_MINUTE` (default 60) + `MCP_RATE_LIMIT_BURST` (default 10) per JWT subject (or client IP if no token). State is per-process and not shared across replicas; for global limits in a multi-replica deployment, place a reverse proxy (nginx, Envoy, Cloudflare) in front or back the limiter with Redis.
 - **No automatic SQLAlchemy tenant filtering.** See section 7 above — every query must include `where(...tenant_id == ...)` manually.
 
 ---

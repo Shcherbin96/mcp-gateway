@@ -29,6 +29,7 @@ from gateway.middleware.authenticate import make_authenticate
 from gateway.middleware.authorize import make_authorize
 from gateway.middleware.chain import CallContext, Pipeline
 from gateway.middleware.execute import make_execute
+from gateway.middleware.rate_limit import RateLimiter
 from gateway.observability.logging import configure_logging, get_logger
 from gateway.observability.metrics import REQUEST_DURATION, REQUESTS_TOTAL
 from gateway.observability.tracing import configure_tracing
@@ -122,6 +123,12 @@ async def lifespan(app: FastAPI):
         ]
     )
     app.state.audit_step = make_audit(writer)
+
+    # Rate limiter (per agent_id; falls back to client IP when no token).
+    app.state.rate_limiter = RateLimiter(
+        rate_per_minute=settings.rate_limit_per_minute,
+        burst=settings.rate_limit_burst,
+    )
 
     # Reaper
     reaper = TimeoutReaper(sf, settings.approval_timeout_seconds, broadcaster)
@@ -246,6 +253,19 @@ async def call_tool(tool_name: str, request: Request):
     token = (
         auth_header[len("Bearer ") :].strip() if auth_header.lower().startswith("bearer ") else None
     )
+
+    # Rate limit BEFORE expensive pipeline work — keyed by JWT sub or client IP.
+    limiter: RateLimiter = request.app.state.rate_limiter
+    client_ip = request.client.host if request.client else None
+    rl_key = RateLimiter.key_from_token(token, client_ip)
+    allowed, retry_after = await limiter.check(rl_key)
+    if not allowed:
+        log.info("rate_limit_exceeded", key=rl_key, tool=tool_name, retry_after=retry_after)
+        return JSONResponse(
+            {"error": "rate_limit_exceeded", "retry_after": retry_after},
+            status_code=429,
+            headers={"Retry-After": str(int(retry_after))},
+        )
 
     # Redact BEFORE the pipeline runs so audit always has redacted_params,
     # even when authentication or other early steps fail.

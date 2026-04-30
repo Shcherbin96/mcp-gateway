@@ -19,7 +19,13 @@ class Settings(BaseSettings):
 
     # Approval
     approval_timeout_seconds: int = 300
-    approval_poll_interval_seconds: float = 1.0
+    # Poll interval is the safety-net fallback for LISTEN/NOTIFY (raised from 1.0 → 5.0
+    # since NOTIFY usually wakes us in ms; polling only matters during failover gaps).
+    approval_poll_interval_seconds: float = 5.0
+
+    # Rate limiting (per JWT subject / agent_id; falls back to client IP when no token).
+    rate_limit_per_minute: int = 60
+    rate_limit_burst: int = 10  # extra capacity for short bursts
 
     # Telegram (optional — gateway works without it via WS-only notifications)
     telegram_bot_token: str | None = None
