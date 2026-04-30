@@ -30,6 +30,7 @@ from gateway.middleware.authorize import make_authorize
 from gateway.middleware.chain import Pipeline
 from gateway.middleware.execute import make_execute
 from gateway.middleware.rate_limit import RateLimiter
+from gateway.middleware.security_headers import install as _install_security_headers
 from gateway.observability.logging import configure_logging, get_logger
 from gateway.observability.tracing import configure_tracing
 from gateway.policy.evaluator import PolicyEvaluator
@@ -212,6 +213,9 @@ app.mount(
     StaticFiles(directory=str(Path(__file__).parent / "web" / "static")),
     name="static",
 )
+
+# Standard security headers on every response (X-Frame-Options, CSP, HSTS, ...).
+_install_security_headers(app)
 
 
 @app.get("/healthz", tags=["Operations"], summary="Liveness probe")
