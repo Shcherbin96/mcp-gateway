@@ -12,6 +12,10 @@ from gateway.tools.registry import ToolRegistry
 
 def make_execute(registry: ToolRegistry):
     async def step(ctx: CallContext) -> None:
+        if ctx.tool is None:
+            ctx.error = ToolError("missing tool")
+            ctx.result_status = "error"
+            return
         rt = registry.get(ctx.tool)
         if not rt:
             ctx.error = ToolError(f"unknown tool: {ctx.tool}")

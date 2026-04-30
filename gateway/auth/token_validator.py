@@ -84,4 +84,4 @@ class HTTPJWKSProvider:
         self._client = PyJWKClient(url, cache_keys=True, lifespan=600)
 
     def __call__(self) -> list[tuple[str, Any]]:
-        return [(k.key_id, k.key) for k in self._client.get_signing_keys()]
+        return [(k.key_id, k.key) for k in self._client.get_signing_keys() if k.key_id is not None]

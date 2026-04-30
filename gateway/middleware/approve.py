@@ -15,6 +15,9 @@ def make_approve(store: ApprovalStore, notifier: ApprovalNotifier, settings=None
         if ctx.decision != Decision.REQUIRES_APPROVAL.value:
             return
 
+        if ctx.tenant_id is None or ctx.agent_id is None or ctx.tool is None:
+            return  # nothing to approve without context
+
         approval_id = await store.create(
             tenant_id=ctx.tenant_id,
             agent_id=ctx.agent_id,

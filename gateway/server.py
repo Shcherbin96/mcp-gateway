@@ -102,7 +102,8 @@ async def lifespan(app: FastAPI):
         )
         await tg_app.initialize()
         await tg_app.start()
-        await tg_app.updater.start_polling()
+        if tg_app.updater is not None:
+            await tg_app.updater.start_polling()
     app.state.tg_app = tg_app
 
     notifier = CompositeNotifier(notifiers)

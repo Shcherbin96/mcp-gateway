@@ -95,7 +95,7 @@ async def seed_demo() -> None:
 
         # Register OAuth client at IdP
         async with httpx.AsyncClient() as client:
-            r = await client.post(
+            resp = await client.post(
                 f"{settings.oauth_issuer}/register",
                 json={
                     "client_name": agent_name,
@@ -109,8 +109,8 @@ async def seed_demo() -> None:
                     ],
                 },
             )
-            r.raise_for_status()
-            creds = r.json()
+            resp.raise_for_status()
+            creds = resp.json()
             print(f"OAuth client_id: {creds['client_id']}")
             print(f"OAuth client_secret: {creds['client_secret']}")
             print("\nObtain token:")
