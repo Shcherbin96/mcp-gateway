@@ -118,7 +118,13 @@ def _render_pending_message(*, agent_id: UUID, tool: str, params: dict) -> str:
     return text
 
 
-def _render_decided_message(*, approval_id: UUID, status: str, tool: str | None) -> str:
+def _render_decided_message(
+    *,
+    approval_id: UUID,
+    status: str,
+    tool: str | None,
+    reason: str | None = None,
+) -> str:
     short = _short_id(approval_id)
     tool_emoji = _tool_emoji(tool)
     tool_suffix = f" `{_md_escape(tool)}`" if tool else ""
@@ -132,7 +138,10 @@ def _render_decided_message(*, approval_id: UUID, status: str, tool: str | None)
     else:
         head = f"*{_md_escape(status)}*"
 
-    return f"{tool_emoji} {head}{tool_suffix}\nApproval `{short}`"
+    lines = [f"{tool_emoji} {head}{tool_suffix}", f"Approval `{short}`"]
+    if reason:
+        lines.append(f"Reason: _{_md_escape(_truncate(reason, 400))}_")
+    return "\n".join(lines)
 
 
 class TelegramNotifier:
@@ -167,9 +176,16 @@ class TelegramNotifier:
             )
 
     async def notify_decided(
-        self, *, approval_id: UUID, status: str, tool: str | None = None
+        self,
+        *,
+        approval_id: UUID,
+        status: str,
+        tool: str | None = None,
+        reason: str | None = None,
     ) -> None:
-        text = _render_decided_message(approval_id=approval_id, status=status, tool=tool)
+        text = _render_decided_message(
+            approval_id=approval_id, status=status, tool=tool, reason=reason
+        )
         try:
             await self._bot.send_message(
                 chat_id=self._chat_id,

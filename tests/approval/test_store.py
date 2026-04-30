@@ -91,6 +91,21 @@ async def test_wait_for_decision_times_out(db_engine, seeded_ids):
     assert status == TIMEOUT
 
 
+async def test_decide_with_reason_persists(db_engine, seeded_ids):
+    """``reason`` argument is written to ``decision_reason`` on commit."""
+    sf = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    store = ApprovalStore(sf)
+    tid, aid = seeded_ids
+    rid = await store.create(tenant_id=tid, agent_id=aid, tool="x", params={})
+    ok = await store.decide(
+        rid, decision="rejected", decided_by="reviewer", reason="too risky for tier-3"
+    )
+    assert ok is True
+    req = await store.get(rid)
+    assert req.status == "rejected"
+    assert req.decision_reason == "too risky for tier-3"
+
+
 async def test_decide_with_tenant_filter(db_engine, seeded_ids):
     """Cross-tenant decide must fail when tenant_id filter is enforced."""
     from uuid import uuid4

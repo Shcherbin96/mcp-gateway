@@ -10,6 +10,7 @@ from fastapi import (
     Body,
     Cookie,
     Depends,
+    Form,
     Header,
     HTTPException,
     Query,
@@ -266,13 +267,21 @@ def make_router(
     async def decide(
         approval_id: UUID,
         decision: str = Query(...),
-        reason: str | None = None,
+        reason_q: str | None = Query(default=None, alias="reason"),
+        reason_f: str | None = Form(default=None, alias="reason"),
         tenant_id: str | None = None,
         cookie_tenant: str | None = Cookie(default=None, alias="tenant_id"),
         admin: str = Depends(_require_admin),
     ):
         if decision not in ("approved", "rejected"):
             return HTMLResponse("invalid decision", status_code=400)
+        # Form body wins over query param when both supplied. Empty string is
+        # treated as "no reason" — DB column is nullable.
+        reason = reason_f if reason_f not in (None, "") else reason_q
+        if reason is not None:
+            reason = reason.strip() or None
+            if reason is not None and len(reason) > 500:
+                reason = reason[:500]
         tid = await _resolve_tenant(tenant_id, cookie_tenant)
         # decided_by is taken from the authenticated admin identity, never the
         # caller — preventing audit forgery via query-param spoofing.
@@ -285,7 +294,9 @@ def make_router(
             tenant_id=tid,
         )
         if ok:
-            await broadcaster.notify_decided(approval_id=approval_id, status=decision)
+            await broadcaster.notify_decided(
+                approval_id=approval_id, status=decision, reason=reason
+            )
         return HTMLResponse("")  # remove the row
 
     @r.websocket("/approvals/ws")

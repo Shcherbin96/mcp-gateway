@@ -43,14 +43,22 @@ class WebSocketBroadcaster:
             }
         )
 
-    async def notify_decided(self, *, approval_id: UUID, status: str, tool: str | None = None):
+    async def notify_decided(
+        self,
+        *,
+        approval_id: UUID,
+        status: str,
+        tool: str | None = None,
+        reason: str | None = None,
+    ):
         # `tool` is accepted for Protocol parity but not broadcast — dashboards
         # already have the tool name from the original `pending` event.
         del tool
-        await self._broadcast(
-            {
-                "type": "decided",
-                "approval_id": str(approval_id),
-                "status": status,
-            }
-        )
+        message: dict = {
+            "type": "decided",
+            "approval_id": str(approval_id),
+            "status": status,
+        }
+        if reason:
+            message["reason"] = reason
+        await self._broadcast(message)

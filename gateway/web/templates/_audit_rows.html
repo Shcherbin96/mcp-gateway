@@ -18,7 +18,12 @@
         <td title="{{ e.created_at.isoformat() }}">{{ e.created_at.strftime("%d %b %H:%M:%S") }}</td>
         <td>{% if e.agent_id %}<code>{{ (e.agent_id|string)[:8] }}</code>{% else %}<span style="color:#94a3b8">—</span>{% endif %}</td>
         <td><strong>{{ e.tool or "—" }}</strong></td>
-        <td><span class="badge badge-{{ e.result_status }}">{{ e.result_status }}</span></td>
+        <td>
+          <span class="badge badge-{{ e.result_status }}">{{ e.result_status }}</span>
+          {% if e.result_json and e.result_json.decision_reason %}
+            <div class="decision-reason"><em>&#x21B3; "{{ e.result_json.decision_reason }}"</em></div>
+          {% endif %}
+        </td>
         <td>
           {% if e.params_json %}
             <details>

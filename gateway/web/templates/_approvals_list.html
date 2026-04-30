@@ -13,18 +13,31 @@
       <pre>{{ a.params_json | tojson(indent=2) }}</pre>
       <div class="approval-actions">
         <button
-          hx-post="/approvals/{{ a.id }}/decide?decision=approved&decided_by={{ user }}"
+          class="btn-approve"
+          hx-post="/approvals/{{ a.id }}/decide?decision=approved"
           hx-target="closest li"
           hx-swap="outerHTML swap:300ms"
           onclick="this.closest('li').classList.add('fade-out')">
           Approve
         </button>
         <button
-          class="danger"
-          hx-post="/approvals/{{ a.id }}/decide?decision=rejected&decided_by={{ user }}"
-          hx-target="closest li"
-          hx-swap="outerHTML swap:300ms"
-          onclick="this.closest('li').classList.add('fade-out')">
+          class="btn-danger"
+          type="button"
+          onclick="
+            var li=this.closest('li');
+            if(li.querySelector('.reason-form'))return;
+            var f=document.createElement('form');
+            f.className='reason-form';
+            f.setAttribute('hx-post','/approvals/{{ a.id }}/decide?decision=rejected');
+            f.setAttribute('hx-target','closest li');
+            f.setAttribute('hx-swap','outerHTML swap:300ms');
+            f.innerHTML='<textarea name=\'reason\' placeholder=\'Reason (optional)\' maxlength=\'500\' rows=\'2\'></textarea>'+
+              '<button class=\'btn-danger\'>Confirm reject</button>'+
+              '<button class=\'btn-secondary\' type=\'button\' onclick=\'this.closest(&quot;.reason-form&quot;).remove()\'>Cancel</button>';
+            this.closest('.approval-actions').appendChild(f);
+            if(window.htmx)window.htmx.process(f);
+            f.querySelector('textarea').focus();
+          ">
           Reject
         </button>
       </div>

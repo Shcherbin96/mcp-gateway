@@ -11,7 +11,12 @@ class ApprovalNotifier(Protocol):
     ) -> None: ...
 
     async def notify_decided(
-        self, *, approval_id: UUID, status: str, tool: str | None = None
+        self,
+        *,
+        approval_id: UUID,
+        status: str,
+        tool: str | None = None,
+        reason: str | None = None,
     ) -> None: ...
 
 
