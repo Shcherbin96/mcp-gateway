@@ -1,5 +1,10 @@
 # MCP Gateway
 
+[![CI](https://github.com/Shcherbin96/mcp-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/Shcherbin96/mcp-gateway/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.13-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-2026--spec-7b61ff.svg)](https://modelcontextprotocol.io)
+
 Production-grade [Model Context Protocol](https://modelcontextprotocol.io) server acting as a security gateway between AI agents and internal company systems.
 
 Every tool call passes through 5 control layers: **authenticate → authorize → approve → execute → audit**.

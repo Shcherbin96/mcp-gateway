@@ -1,10 +1,14 @@
 {
   "mcpServers": {
     "mcp-gateway": {
-      "transport": {
-        "type": "http",
-        "url": "https://mcp-gateway.fly.dev/mcp",
-        "headers": {"Authorization": "Bearer <token>"}
+      "command": "/path/to/mcp-gateway/.venv/bin/python",
+      "args": ["-m", "gateway.mcp_stdio_proxy"],
+      "env": {
+        "PYTHONPATH": "/path/to/mcp-gateway",
+        "MCP_GATEWAY_URL": "http://localhost:8000",
+        "MCP_GATEWAY_OAUTH_ISSUER": "http://localhost:9000",
+        "MCP_GATEWAY_CLIENT_ID": "<paste client_id printed by `make seed`>",
+        "MCP_GATEWAY_CLIENT_SECRET": "<paste client_secret printed by `make seed`>"
       }
     }
   }

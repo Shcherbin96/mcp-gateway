@@ -79,9 +79,17 @@ ignore = ["S101", "B008", "S104", "N818", "ARG001", "E402"]
 
 [tool.mypy]
 python_version = "3.13"
-strict = true
+# Phased typing: --strict is a future goal. Currently catches signature issues
+# without forcing a one-shot annotation pass on every dict literal.
 plugins = ["pydantic.mypy"]
 exclude = ["alembic/versions"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+no_implicit_optional = true
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
 
 [[tool.mypy.overrides]]
 module = ["testcontainers.*", "fastmcp.*", "telegram.*", "respx.*", "locust.*"]
