@@ -1,13 +1,43 @@
-# MCP Gateway
+<div align="center">
+
+# 🛡️ MCP Gateway
+
+### A production-grade security envelope for AI agents
+
+*OAuth 2.1 · RBAC · Human-in-the-loop approval · Append-only audit*
 
 [![CI](https://github.com/Shcherbin96/mcp-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/Shcherbin96/mcp-gateway/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.13-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-2026--spec-7b61ff.svg)](https://modelcontextprotocol.io)
+[![Tests](https://img.shields.io/badge/tests-67%20passing-brightgreen.svg)](#tests)
 
-Production-grade [Model Context Protocol](https://modelcontextprotocol.io) server acting as a security gateway between AI agents and internal company systems.
+🎬 **[Watch the 2-minute demo](#demo)** · 📖 **[Read the write-up](docs/blog/building-production-grade-mcp-gateway.md)** · 🏗️ **[See the architecture](docs/architecture.md)**
 
-Every tool call passes through 5 control layers: **authenticate → authorize → approve → execute → audit**.
+</div>
+
+---
+
+```
+   Claude Desktop                ┌──────────────────────────────────────┐
+   (or any MCP client)           │             MCP Gateway              │
+            │                    │  1. Authenticate ─ OAuth 2.1 / JWT   │
+            │   ① tool call      │  2. Authorize    ─ RBAC (YAML)       │
+            ├──────────────────► │  3. Approve?     ─ Telegram + Web UI │ ──┐
+            │                    │  4. Execute      ─ retry + breaker   │   │ ④ approval
+            │   ⑥ result/error   │  5. Audit        ─ append-only       │   │ request
+            │ ◄──────────────────┤                                      │   │
+            │                    └──────────────┬───────────────────────┘   │
+            │                                   │ ⑤ HTTPS                   │
+            │                                   ▼                           ▼
+            │                            Internal systems         📱 Telegram bot
+            │                          (CRM, payments, …)            ✅ / ❌
+            │                                                           │
+            │   ⑦ "operation rejected by administrator"                 │
+            │ ◄─────────────────────────────────────────────────────────┘
+```
+
+> 💡 **Why it matters:** most AI-agent demos give the agent unrestricted access to internal systems. That's fine for toys. In production you need authentication, RBAC, human approval on destructive actions, and a tamper-proof audit trail. This project is exactly that — the 80% nobody else builds.
 
 > Full design — `docs/superpowers/specs/2026-04-29-mcp-gateway-design.md`
 > Implementation plan — `docs/superpowers/plans/2026-04-29-mcp-gateway.md`
@@ -35,6 +65,18 @@ MCP Gateway is that envelope.
 - **Test pyramid** — unit, integration (testcontainers), E2E (docker-compose), security, mutation, load (locust)
 - **One-command local dev** — `docker compose up`
 - **Fly.io deployment** with managed Postgres
+
+---
+
+<a id="demo"></a>
+
+## Demo
+
+🎬 **2-minute walkthrough** — *(Loom link goes here)*
+
+Demo flow: Claude Desktop calls `refund_payment` → gateway requires human approval → Telegram bot pings my phone with a card showing the customer + amount → I tap **Reject** → Claude receives "approval rejected" and apologises in chat → the audit log shows the full transaction with my Telegram username as the rejector.
+
+5 layers, 1 minute, real Claude, real Telegram, real Postgres-backed audit.
 
 ---
 
